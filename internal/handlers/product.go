@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 
 	"github.com/evermos/boilerplate-go/internal/domain/product"
@@ -64,19 +63,7 @@ func (h *ProductHandler) ResolveProducts(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resp := struct {
-		Data        []product.Product `json:"data"`
-		Total       int               `json:"total"`
-		PerPage     int               `json:"perPage"`
-		CurrentPage int               `json:"currentPage"`
-		TotalPages  int               `json:"totalPages"`
-	}{
-		Data:        products,
-		Total:       total,
-		PerPage:     limit,
-		CurrentPage: page,
-		TotalPages:  int(math.Ceil(float64(total) / float64(limit))),
-	}
+	resp, err := h.ProductService.CreatePaginationResponse(products, total, limit, page)
 
 	response.WithJSON(w, http.StatusOK, resp)
 }

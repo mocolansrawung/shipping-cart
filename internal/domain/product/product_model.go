@@ -26,6 +26,14 @@ type Product struct {
 	DeletedBy nuuid.NUUID `db:"deleted_by"`
 }
 
+type ProductPagination struct {
+	Data        []Product `json:"data"`
+	Total       int       `json:"total"`
+	PerPage     int       `json:"perPage"`
+	CurrentPage int       `json:"currentPage"`
+	TotalPages  int       `json:"totalPages"`
+}
+
 type ProductQueryParams struct {
 	Page     int
 	Limit    int

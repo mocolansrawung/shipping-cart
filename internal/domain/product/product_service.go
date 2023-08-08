@@ -1,6 +1,8 @@
 package product
 
 import (
+	"math"
+
 	"github.com/evermos/boilerplate-go/configs"
 	"github.com/evermos/boilerplate-go/shared/failure"
 	"github.com/gofrs/uuid"
@@ -9,6 +11,7 @@ import (
 type ProductService interface {
 	CreateProduct(requestFormat ProductRequestFormat, userID uuid.UUID) (product Product, err error)
 	GetProducts(params ProductQueryParams) (products []Product, total int, err error)
+	CreatePaginationResponse(products []Product, total int, limit int, page int) (productPagination ProductPagination, err error)
 }
 
 type ProductServiceImpl struct {
@@ -51,6 +54,18 @@ func (s *ProductServiceImpl) GetProducts(params ProductQueryParams) (products []
 	total, err = s.ProductRepository.CountAllProducts()
 	if err != nil {
 		return
+	}
+
+	return
+}
+
+func (s *ProductServiceImpl) CreatePaginationResponse(products []Product, total int, limit int, page int) (productPagination ProductPagination, err error) {
+	productPagination = ProductPagination{
+		Data:        products,
+		Total:       total,
+		PerPage:     limit,
+		CurrentPage: page,
+		TotalPages:  int(math.Ceil(float64(total) / float64(limit))),
 	}
 
 	return
