@@ -26,10 +26,10 @@ func main() {
 	// Wire everything up
 	http := InitializeService()
 
-	consumers := InitializeEvent()
+	// consumers := InitializeEvent()
 
 	// Start consumers
-	consumers.Start()
+	// consumers.Start()
 
 	// Run server
 	http.SetupAndServe()
