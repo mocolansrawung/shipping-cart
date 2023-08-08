@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS `product`;
 
 CREATE TABLE `product` (
   `id` VARCHAR(55) PRIMARY KEY NOT NULL,
+  `user_id` VARCHAR(55) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
   `price` DECIMAL(10,2) NOT NULL,
   `brand` VARCHAR(255) NOT NULL,

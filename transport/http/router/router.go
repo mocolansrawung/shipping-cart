@@ -8,6 +8,7 @@ import (
 // DomainHandlers is a struct that contains all domain-specific handlers.
 type DomainHandlers struct {
 	FooBarBazHandler handlers.FooBarBazHandler
+	ProductHandler   handlers.ProductHandler
 }
 
 // Router is the router struct containing handlers.
@@ -26,5 +27,6 @@ func ProvideRouter(domainHandlers DomainHandlers) Router {
 func (r *Router) SetupRoutes(mux *chi.Mux) {
 	mux.Route("/v1", func(rc chi.Router) {
 		r.DomainHandlers.FooBarBazHandler.Router(rc)
+		r.DomainHandlers.ProductHandler.Router(rc)
 	})
 }

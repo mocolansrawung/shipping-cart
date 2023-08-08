@@ -1,1 +1,42 @@
 package product
+
+import (
+	"github.com/evermos/boilerplate-go/configs"
+	"github.com/evermos/boilerplate-go/shared/failure"
+	"github.com/gofrs/uuid"
+)
+
+type ProductService interface {
+	CreateProduct(requestFormat ProductRequestFormat, userID uuid.UUID) (product Product, err error)
+}
+
+type ProductServiceImpl struct {
+	ProductRepository ProductRepository
+	Config            *configs.Config
+}
+
+func ProvideProductServiceImpl(productRepository ProductRepository, config *configs.Config) *ProductServiceImpl {
+	s := new(ProductServiceImpl)
+	s.ProductRepository = productRepository
+	s.Config = config
+
+	return s
+}
+
+func (s *ProductServiceImpl) CreateProduct(requestFormat ProductRequestFormat, userID uuid.UUID) (product Product, err error) {
+	product, err = product.NewProductFromRequestFormat(requestFormat, userID)
+	if err != nil {
+		return
+	}
+
+	if err != nil {
+		return product, failure.BadRequest(err)
+	}
+
+	err = s.ProductRepository.CreateProduct(product)
+	if err != nil {
+		return
+	}
+
+	return
+}
