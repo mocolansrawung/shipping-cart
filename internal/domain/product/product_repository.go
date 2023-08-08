@@ -1,6 +1,8 @@
 package product
 
 import (
+	"database/sql"
+
 	"github.com/evermos/boilerplate-go/infras"
 	"github.com/evermos/boilerplate-go/shared/failure"
 	"github.com/evermos/boilerplate-go/shared/logger"
@@ -10,8 +12,28 @@ import (
 
 var (
 	productQueries = struct {
-		insertProduct string
+		selectProducts string
+		insertProduct  string
 	}{
+		selectProducts: `
+			SELECT
+				id,
+				user_id,
+				name,
+				price,
+				brand,
+				category,
+				stock,
+				created_at,
+				created_by,
+				updated_at,
+				updated_by,
+				deleted_at,
+				deleted_by
+			FROM product
+			WHERE 1=1
+		`,
+
 		insertProduct: `
 			INSERT INTO product (
 				id,
@@ -48,6 +70,8 @@ var (
 
 type ProductRepository interface {
 	CreateProduct(product Product) (err error)
+	ResolveProductsByQuery(params ProductQueryParams) (products []Product, err error)
+	CountAllProducts() (total int, err error)
 }
 
 type ProductRepositoryMySQL struct {
@@ -82,6 +106,75 @@ func (r *ProductRepositoryMySQL) CreateProduct(product Product) (err error) {
 
 		e <- nil
 	})
+}
+
+func (r *ProductRepositoryMySQL) ResolveProductsByQuery(params ProductQueryParams) (products []Product, err error) {
+	query := productQueries.selectProducts
+
+	var args []interface{}
+
+	if params.Category != "" {
+		query += " AND category = ?"
+		args = append(args, params.Category)
+	}
+
+	if params.Brand != "" {
+		query += " AND query = ?"
+		args = append(args, params.Brand)
+	}
+
+	if params.Sort != "" && params.Order != "" {
+		allowedSorts := map[string]bool{
+			"name":  true,
+			"price": true,
+			"brand": true,
+			"stock": true,
+		}
+		allowedOrders := map[string]bool{
+			"asc":  true,
+			"desc": true,
+		}
+
+		if allowedSorts[params.Sort] && allowedOrders[params.Order] {
+			query += " ORDER BY " + params.Sort + " " + params.Order
+		}
+	}
+
+	if params.Limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, params.Limit)
+
+		if params.Page > 1 {
+			offset := (params.Page - 1) * params.Limit
+			query += " OFFSET ?"
+			args = append(args, offset)
+		}
+	}
+
+	err = r.DB.Read.Select(&products, query, args...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = failure.NotFound("courses")
+			logger.ErrorWithStack(err)
+			return nil, err
+		}
+
+		logger.ErrorWithStack(err)
+		return nil, err
+	}
+
+	return products, nil
+}
+
+func (r *ProductRepositoryMySQL) CountAllProducts() (total int, err error) {
+	query := `SELECT COUNT(*) FROM product`
+
+	err = r.DB.Read.QueryRow(query).Scan(&total)
+	if err != nil {
+		logger.ErrorWithStack(err)
+	}
+
+	return total, nil
 }
 
 func (r *ProductRepositoryMySQL) ExistsByID(id uuid.UUID) (exists bool, err error) {

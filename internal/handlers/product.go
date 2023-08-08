@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 
 	"github.com/evermos/boilerplate-go/internal/domain/product"
@@ -27,12 +28,57 @@ func ProvideProductHandler(productService product.ProductService, authMiddleware
 func (h *ProductHandler) Router(r chi.Router) {
 	r.Route("/products", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(h.AuthMiddleware.ValidateAuth)
 			// r.Use(h.AuthMiddleware.UserRoleCheck)
-			// r.Get("/", h.ResolveCourses)
+			r.Use(h.AuthMiddleware.ValidateAuth)
+			r.Get("/", h.ResolveProducts)
 			r.Post("/", h.CreateProduct)
 		})
 	})
+}
+
+func (h *ProductHandler) ResolveProducts(w http.ResponseWriter, r *http.Request) {
+	pageString := r.URL.Query().Get("page")
+	page, err := shared.ConvertQueryParamsToInt(pageString)
+	if err != nil || page < 0 {
+		page = 1
+	}
+
+	limitString := r.URL.Query().Get("limit")
+	limit, err := shared.ConvertQueryParamsToInt(limitString)
+	if err != nil || limit <= 0 {
+		limit = 10
+	}
+
+	params := product.ProductQueryParams{
+		Page:     page,
+		Limit:    limit,
+		Sort:     r.URL.Query().Get("sort"),
+		Order:    r.URL.Query().Get("order"),
+		Brand:    r.URL.Query().Get("brand"),
+		Category: r.URL.Query().Get("category"),
+	}
+
+	products, total, err := h.ProductService.GetProducts(params)
+	if err != nil {
+		response.WithError(w, err)
+		return
+	}
+
+	resp := struct {
+		Data        []product.Product `json:"data"`
+		Total       int               `json:"total"`
+		PerPage     int               `json:"perPage"`
+		CurrentPage int               `json:"currentPage"`
+		TotalPages  int               `json:"totalPages"`
+	}{
+		Data:        products,
+		Total:       total,
+		PerPage:     limit,
+		CurrentPage: page,
+		TotalPages:  int(math.Ceil(float64(total) / float64(limit))),
+	}
+
+	response.WithJSON(w, http.StatusOK, resp)
 }
 
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {

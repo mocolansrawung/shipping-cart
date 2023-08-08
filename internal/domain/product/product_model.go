@@ -31,8 +31,8 @@ type ProductQueryParams struct {
 	Limit    int
 	Sort     string
 	Order    string
+	Brand    string
 	Category string
-	Stock    string
 }
 
 func (p Product) MarshalJSON() ([]byte, error) {

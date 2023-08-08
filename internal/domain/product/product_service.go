@@ -8,6 +8,7 @@ import (
 
 type ProductService interface {
 	CreateProduct(requestFormat ProductRequestFormat, userID uuid.UUID) (product Product, err error)
+	GetProducts(params ProductQueryParams) (products []Product, total int, err error)
 }
 
 type ProductServiceImpl struct {
@@ -34,6 +35,20 @@ func (s *ProductServiceImpl) CreateProduct(requestFormat ProductRequestFormat, u
 	}
 
 	err = s.ProductRepository.CreateProduct(product)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s *ProductServiceImpl) GetProducts(params ProductQueryParams) (products []Product, total int, err error) {
+	products, err = s.ProductRepository.ResolveProductsByQuery(params)
+	if err != nil {
+		return
+	}
+
+	total, err = s.ProductRepository.CountAllProducts()
 	if err != nil {
 		return
 	}
