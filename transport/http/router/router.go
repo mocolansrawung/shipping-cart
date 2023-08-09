@@ -9,6 +9,7 @@ import (
 type DomainHandlers struct {
 	FooBarBazHandler handlers.FooBarBazHandler
 	ProductHandler   handlers.ProductHandler
+	CartHandler      handlers.CartHandler
 }
 
 // Router is the router struct containing handlers.
@@ -28,5 +29,6 @@ func (r *Router) SetupRoutes(mux *chi.Mux) {
 	mux.Route("/v1", func(rc chi.Router) {
 		r.DomainHandlers.FooBarBazHandler.Router(rc)
 		r.DomainHandlers.ProductHandler.Router(rc)
+		r.DomainHandlers.CartHandler.Router(rc)
 	})
 }

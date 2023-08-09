@@ -7,12 +7,12 @@ CREATE TABLE `cart` (
   `updated_by` VARCHAR(55) NULL DEFAULT NULL,
   `deleted_at` TIMESTAMP NULL DEFAULT NULL,
   `deleted_by` VARCHAR(55) NULL DEFAULT NULL
-  FOREIGN KEY (`user_id`) REFERENCES `User`(`user_id`)
 );
 
 CREATE TABLE `cart_item` (
   `cart_id` VARCHAR(55) NOT NULL,
   `product_id` VARCHAR(55) NOT NULL,
+  `unit_price` DECIMAL(10,2) NOT NULL,
   `quantity` INT NOT NULL,
   `cost` DECIMAL(10,2) NOT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -20,10 +20,23 @@ CREATE TABLE `cart_item` (
   `updated_at` TIMESTAMP NULL DEFAULT NULL,
   `updated_by` VARCHAR(55) NULL DEFAULT NULL,
   `deleted_at` TIMESTAMP NULL DEFAULT NULL,
-  `deleted_by` VARCHAR(55) NULL DEFAULT NULL
-  FOREIGN KEY (`cart_id`) REFERENCES `Cart`(`id`),
-  FOREIGN KEY (`product_id`) REFERENCES `Product`(`id`)
+  `deleted_by` VARCHAR(55) NULL DEFAULT NULL,
+  CONSTRAINT `fk_cart_item_cart` FOREIGN KEY (`cart_id`) REFERENCES `cart`(`id`),
+  CONSTRAINT `fk_cart_item_product` FOREIGN KEY (`product_id`) REFERENCES `product`(`id`)
 );
+
+-- Insert a cart for the user
+INSERT INTO `cart` (`id`, `user_id`, `created_by`)
+VALUES ('c1234567-89ab-cdef-0123-456789abcdef', '2407ae50-3a74-49f9-876c-ecef1087229f', 'syst2407ae50-3a74-49f9-876c-ecef1087229fem');
+
+-- Insert multiple items into the cart
+-- Assuming the product IDs: 'p1', 'p2', 'p3' exist in the `product` table
+INSERT INTO `cart_item` (`cart_id`, `product_id`, `price`, `quantity`, `cost`, `created_by`)
+VALUES 
+('c1234567-89ab-cdef-0123-456789abcdef', '1c0a7155-f770-4c64-ad9e-6ca5d12b2636', 99.99, 1, 99.99, '2407ae50-3a74-49f9-876c-ecef1087229f'),
+('c1234567-89ab-cdef-0123-456789abcdef', 'e11f94c4-60b1-4da6-be31-379b1ff2a117', 99.99, 1, 99.99, '2407ae50-3a74-49f9-876c-ecef1087229f');
+
+
 
 CREATE TABLE `order` (
   `id` VARCHAR(55) PRIMARY KEY,
@@ -36,12 +49,12 @@ CREATE TABLE `order` (
   `updated_by` VARCHAR(55) NULL DEFAULT NULL,
   `deleted_at` TIMESTAMP NULL DEFAULT NULL,
   `deleted_by` VARCHAR(55) NULL DEFAULT NULL
-  FOREIGN KEY (`user_id`) REFERENCES `User`(`user_id`)
 );
 
 CREATE TABLE `order_item` (
   `order_id` VARCHAR(55) NOT NULL,
   `product_id` VARCHAR(55) NOT NULL,
+  `unit_price` DECIMAL(10,2) NOT NULL,
   `quantity` INT NOT NULL,
   `cost` DECIMAL(10,2),
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -49,9 +62,9 @@ CREATE TABLE `order_item` (
   `updated_at` TIMESTAMP NULL DEFAULT NULL,
   `updated_by` VARCHAR(55) NULL DEFAULT NULL,
   `deleted_at` TIMESTAMP NULL DEFAULT NULL,
-  `deleted_by` VARCHAR(55) NULL DEFAULT NULL
-  FOREIGN KEY (`order_id`) REFERENCES `Order`(`id`),
-  FOREIGN KEY (`product_id`) REFERENCES `Product`(`id`)
+  `deleted_by` VARCHAR(55) NULL DEFAULT NULL,
+  CONSTRAINT `fk_order_item_order` FOREIGN KEY (`order_id`) REFERENCES `order`(`id`),
+  CONSTRAINT `fk_order_item_product` FOREIGN KEY (`product_id`) REFERENCES `product`(`id`)
 );
 
 INSERT INTO `cart` (`id`, `user_id`, `created_by`)
