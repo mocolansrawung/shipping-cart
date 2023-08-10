@@ -1,14 +1,17 @@
 package cart
 
 import (
+	"errors"
 	"time"
 
 	"github.com/evermos/boilerplate-go/configs"
 	"github.com/evermos/boilerplate-go/shared/failure"
+	"github.com/evermos/boilerplate-go/shared/logger"
 	"github.com/gofrs/uuid"
 )
 
 type CartService interface {
+	EnsureCartExists(userID uuid.UUID) (cartID uuid.UUID, err error)
 	AddItemToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error)
 	ResolveByUserID(id uuid.UUID, withItems bool) (cart Cart, err error)
 }
@@ -26,65 +29,77 @@ func ProvideCartServiceImpl(cartRepository CartRepository, config *configs.Confi
 	return s
 }
 
-func (s *CartServiceImpl) AddItemToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error) {
-	// 1. Check if cart exists for the user.
+func (s *CartServiceImpl) EnsureCartExists(userID uuid.UUID) (cartID uuid.UUID, err error) {
 	exists, err := s.CartRepository.ExistsByUserID(userID)
 	if err != nil {
-		return cartItem, err
+		// logger.Error("Failed to check if cart exists:", err)
+		return
 	}
 
-	// 2. If the cart doesn't exist for this user, create one.
 	if !exists {
 		newCart := Cart{
 			UserID:    userID,
 			CreatedAt: time.Now(),
-			CreatedBy: userID, // Assuming the user creating is the user itself. Change as needed.
+			CreatedBy: userID,
 		}
-
 		err = s.CartRepository.CreateCart(newCart)
 		if err != nil {
-			return cartItem, err
+			return
 		}
 	}
 
-	// 3. Proceed with adding the item to the cart.
+	cart, err := s.CartRepository.ResolveByUserID(userID)
+	if err != nil {
+		return
+	}
+
+	cartID = cart.ID
+
+	return
+}
+
+func (s *CartServiceImpl) AddItemToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error) {
 	cartItem, err = cartItem.NewCartItemFromRequestFormat(requestFormat, userID)
 	if err != nil {
+		logger.ErrorWithStack(err)
 		return cartItem, failure.BadRequest(err)
 	}
 
-	err = s.CartRepository.AddItemToCart(cartItem, userID)
+	cartItem.CartID = requestFormat.CartID
+
+	price, stock, err := s.CartRepository.GetPriceAndStockByProductID(cartItem.ProductID)
+	if err != nil || stock < cartItem.Quantity {
+		logger.ErrorWithStack(err)
+		return cartItem, failure.BadRequest(errors.New("insufficient stock"))
+	}
+	cartItem.UnitPrice = price
+	cartItem.Recalculate()
+
+	currentQuantity, err := s.CartRepository.GetCurrentItemQuantity(cartItem)
 	if err != nil {
-		return cartItem, err
+		return cartItem, failure.InternalError(err)
 	}
 
-	// Implement later:
-	// Handle any business logic, e.g., checking if the item is already in the cart and updating the quantity.
+	if currentQuantity > 0 {
+		updatedQuantity := currentQuantity + cartItem.Quantity
+		cartItem.Quantity = updatedQuantity
 
-	return cartItem, nil
+		cartItem.Recalculate()
+
+		err = s.CartRepository.UpdateItemQuantity(cartItem)
+		if err != nil {
+			return cartItem, failure.InternalError(err)
+		}
+
+	} else {
+		err := s.CartRepository.AddItemToCart(cartItem, userID)
+		if err != nil {
+			return cartItem, failure.InternalError(err)
+		}
+	}
+
+	return
 }
-
-// func (s *CartServiceImpl) AddItemToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error) {
-// 	// Call the repository's AddItemToCart method.
-// 	cartItem, err = cartItem.NewCartItemFromRequestFormat(requestFormat, userID)
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	if err != nil {
-// 		return cartItem, failure.BadRequest(err)
-// 	}
-
-// 	err = s.CartRepository.AddItemToCart(cartItem, userID)
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	// Implement later
-// 	// Handle any business logic, e.g., checking if the item is already in the cart and updating the quantity.
-
-// 	return
-// }
 
 func (s *CartServiceImpl) ResolveByUserID(id uuid.UUID, withItems bool) (cart Cart, err error) {
 	cart, err = s.CartRepository.ResolveByUserID(id)

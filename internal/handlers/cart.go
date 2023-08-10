@@ -29,7 +29,7 @@ func (h *CartHandler) Router(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			// r.Use(h.AuthMiddleware.AdminRoleCheck)
 			r.Use(h.AuthMiddleware.ValidateAuth)
-			// r.Post("/", h.AddToCart)
+			r.Post("/", h.AddToCart)
 			r.Get("/", h.GetCartByID)
 		})
 	})
@@ -66,6 +66,13 @@ func (h *CartHandler) AddToCart(w http.ResponseWriter, r *http.Request) {
 		response.WithError(w, failure.BadRequest(err))
 		return
 	}
+
+	cartID, err := h.CartService.EnsureCartExists(userID)
+	if err != nil {
+		response.WithError(w, failure.BadRequest(err))
+	}
+
+	requestFormat.CartID = cartID
 
 	err = shared.GetValidator().Struct(requestFormat)
 	if err != nil {

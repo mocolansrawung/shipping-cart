@@ -2,6 +2,7 @@ package cart
 
 import (
 	"encoding/json"
+	"math"
 	"time"
 
 	"github.com/evermos/boilerplate-go/shared"
@@ -16,8 +17,8 @@ type Cart struct {
 	UserID    uuid.UUID   `db:"user_id" valdiate:"required"`
 	CreatedAt time.Time   `db:"created_at" validate:"required"`
 	CreatedBy uuid.UUID   `db:"created_by" validate:"required"`
-	UpdatedAt null.Time   `db:"updated_at" validate:"required"`
-	UpdatedBy nuuid.NUUID `db:"updated_by" validate:"required"`
+	UpdatedAt null.Time   `db:"updated_at"`
+	UpdatedBy nuuid.NUUID `db:"updated_by"`
 	DeletedAt null.Time   `db:"deleted_at"`
 	DeletedBy nuuid.NUUID `db:"deleted_by"`
 	Items     []CartItem  `db:"-" validate:"required,dive,required"`
@@ -110,8 +111,6 @@ func (ci CartItem) NewCartItemFromRequestFormat(req CartItemRequestFormat, userI
 		CreatedBy: userID,
 	}
 
-	err = newCartItem.Validate()
-
 	return
 }
 
@@ -121,7 +120,7 @@ func (ci *CartItem) Validate() (err error) {
 }
 
 func (ci *CartItem) Recalculate() {
-	ci.Cost = float64(ci.Quantity) * ci.UnitPrice
+	ci.Cost = math.Round(float64(ci.Quantity)*ci.UnitPrice*100) / 100
 }
 
 func (ci *CartItem) ToResponseFormat() CartItemResponseFormat {

@@ -20,6 +20,7 @@ var (
 		insertCart                    string
 		insertCartItemBulk            string
 		insertCartItemBulkPlaceholder string
+		updateCartItem                string
 	}{
 		selectCart: `
 			SELECT
@@ -103,6 +104,21 @@ var (
 				:deleted_by
 			)
 		`,
+
+		updateCartItem: `
+			UPDATE cart_item
+			SET
+				cart_id = :cart_id,
+				product_id = :product_id,
+				unit_price = :unit_price,
+				quantity = :quantity,
+				cost = :cost,
+				created_at = :created_at,
+				created_by = :created_by,
+				updated_at = :updated_at,
+				updated_by = :updated_by,
+				deleted_at = :deleted_at
+		`,
 	}
 )
 
@@ -113,6 +129,10 @@ type CartRepository interface {
 	ResolveItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error)
 	ExistsByUserID(id uuid.UUID) (exists bool, err error)
 	GetCartIDByUserID(userID uuid.UUID) (cartID uuid.UUID, err error)
+	GetPriceAndStockByProductID(productID uuid.UUID) (price float64, stock int, err error)
+	ItemExistsInCart(cartItem CartItem) (exists bool, err error)
+	GetCurrentItemQuantity(cartItem CartItem) (latestQuantity int, err error)
+	UpdateItemQuantity(cartItem CartItem) (err error)
 }
 
 type CartRepositoryMySQL struct {
@@ -127,18 +147,6 @@ func ProvideCartRepositoryMySQL(db *infras.MySQLConn) *CartRepositoryMySQL {
 }
 
 func (r *CartRepositoryMySQL) CreateCart(cart Cart) (err error) {
-	exists, err := r.ExistsByUserID(cart.UserID)
-	if err != nil {
-		logger.ErrorWithStack(err)
-		return
-	}
-
-	if exists {
-		err = failure.Conflict("create", "userID with cartID", "already exists")
-		logger.ErrorWithStack(err)
-		return
-	}
-
 	return r.DB.WithTransaction(func(tx *sqlx.Tx, e chan error) {
 		if err := r.txCreate(tx, cart); err != nil {
 			e <- err
@@ -153,35 +161,22 @@ func (r *CartRepositoryMySQL) CreateCart(cart Cart) (err error) {
 		e <- nil
 	})
 }
-
 func (r *CartRepositoryMySQL) AddItemToCart(cartItem CartItem, userID uuid.UUID) (err error) {
-	// 1. Check if the cart exists for the user.
-	cartID, err := r.GetCartIDByUserID(userID)
-	if err != nil {
-		return
-	}
-
-	// 2. If not, create a new cart.
-	if cartID == uuid.Nil {
+	if cartItem.CartID == uuid.Nil {
 		newCart := Cart{
 			UserID:    userID,
 			CreatedAt: time.Now(),
 			CreatedBy: userID,
-			// ... any other necessary fields
 		}
 
 		if err := r.CreateCart(newCart); err != nil {
 			return err
 		}
 
-		// Set the CartID of the cartItem to the ID of the new cart.
 		cartItem.CartID = newCart.ID
-		cartID = newCart.ID
 	}
 
-	// 3. Add the item to the cart.
 	return r.DB.WithTransaction(func(tx *sqlx.Tx, e chan error) {
-		// Using your bulk insertion, although we're inserting only one item, we can make use of the bulk insert feature.
 		err := r.txCreateItems(tx, []CartItem{cartItem})
 		if err != nil {
 			e <- err
@@ -191,34 +186,6 @@ func (r *CartRepositoryMySQL) AddItemToCart(cartItem CartItem, userID uuid.UUID)
 		e <- nil
 	})
 }
-
-// func (r *CartRepositoryMySQL) AddItemToCart(cartItem CartItem, userID uuid.UUID) (err error) {
-// 	// 1. Check if the cart exists for the user.
-// 	cartID, err := r.GetCartIDByUserID(userID)
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	// 2. If not, create a new cart.
-
-// 	if cartID == uuid.Nil {
-
-// 	}
-
-// 	// 3. Add the item to the cart.
-// 	// 4. Return any errors encountered.
-
-// 	return r.DB.WithTransaction(func(tx *sqlx.Tx, e chan error) {
-// 		if err := r.txCreate(tx, cartItem); err != nil {
-// 			e <- err
-// 			return
-// 		}
-
-// 		e <- nil
-// 	})
-
-// }
-
 func (r *CartRepositoryMySQL) ResolveByUserID(id uuid.UUID) (cart Cart, err error) {
 	err = r.DB.Read.Get(
 		&cart,
@@ -235,7 +202,6 @@ func (r *CartRepositoryMySQL) ResolveByUserID(id uuid.UUID) (cart Cart, err erro
 
 	return
 }
-
 func (r *CartRepositoryMySQL) ResolveItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error) {
 	if len(ids) == 0 {
 		return
@@ -255,12 +221,53 @@ func (r *CartRepositoryMySQL) ResolveItemsByCartID(ids []uuid.UUID) (cartItems [
 
 	return
 }
+func (r *CartRepositoryMySQL) ItemExistsInCart(cartItem CartItem) (exists bool, err error) {
+	err = r.DB.Read.Get(
+		&exists,
+		"SELECT COUNT(produc_id) FROM cart WHERE cart_id = ? and product_id = ?",
+		cartItem.CartID.String(), cartItem.ProductID.String())
+	if err != nil {
+		logger.ErrorWithStack(err)
+	}
 
-// Exists Functions
+	return
+}
+func (r *CartRepositoryMySQL) GetCurrentItemQuantity(cartItem CartItem) (latestQuantity int, err error) {
+	query := "SELECT quantity FROM cart_item WHERE cart_id = ? AND product_id = ?"
+	err = r.DB.Read.QueryRow(query, cartItem.CartID, cartItem.ProductID).Scan(&latestQuantity)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return
+}
+func (r *CartRepositoryMySQL) UpdateItemQuantity(cartItem CartItem) (err error) {
+	return r.DB.WithTransaction(func(tx *sqlx.Tx, e chan error) {
+		if err := r.txUpdate(tx, cartItem); err != nil {
+			e <- err
+			return
+		}
+
+		e <- nil
+	})
+}
+func (r *CartRepositoryMySQL) GetPriceAndStockByProductID(productID uuid.UUID) (price float64, stock int, err error) {
+	query := "SELECT price, stock FROM product WHERE id = ?"
+	err = r.DB.Read.QueryRow(query, productID).Scan(&price, &stock)
+	if err != nil {
+		return
+	}
+
+	return
+}
 func (r *CartRepositoryMySQL) ExistsByUserID(id uuid.UUID) (exists bool, err error) {
 	err = r.DB.Read.Get(
 		&exists,
-		"SELECT COUNT(entity_id) FROM cart WHERE user_id = ?",
+		"SELECT COUNT(id) FROM cart WHERE user_id = ?",
 		id.String())
 	if err != nil {
 		logger.ErrorWithStack(err)
@@ -304,7 +311,6 @@ func (r *CartRepositoryMySQL) txCreate(tx *sqlx.Tx, cart Cart) (err error) {
 
 	return
 }
-
 func (r *CartRepositoryMySQL) composeBulkInsertItemQuery(cartItems []CartItem) (query string, params []interface{}, err error) {
 	values := []string{}
 	for _, ci := range cartItems {
@@ -331,7 +337,6 @@ func (r *CartRepositoryMySQL) composeBulkInsertItemQuery(cartItems []CartItem) (
 	query = fmt.Sprintf("%v %v", cartQueries.insertCartItemBulk, strings.Join(values, ","))
 	return
 }
-
 func (r *CartRepositoryMySQL) txCreateItems(tx *sqlx.Tx, cartItems []CartItem) (err error) {
 	if len(cartItems) == 0 {
 		return
@@ -349,6 +354,21 @@ func (r *CartRepositoryMySQL) txCreateItems(tx *sqlx.Tx, cartItems []CartItem) (
 	defer stmt.Close()
 
 	_, err = stmt.Stmt.Exec(args...)
+	if err != nil {
+		logger.ErrorWithStack(err)
+	}
+
+	return
+}
+func (r *CartRepositoryMySQL) txUpdate(tx *sqlx.Tx, cartItem CartItem) (err error) {
+	stmt, err := tx.PrepareNamed(cartQueries.updateCartItem)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(cartItem)
 	if err != nil {
 		logger.ErrorWithStack(err)
 	}
