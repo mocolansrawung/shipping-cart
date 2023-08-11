@@ -67,8 +67,9 @@ func (s *OrderServiceImpl) Checkout(requestFormat OrderRequestFormat, userID uui
 		Status:    "pending",
 	}
 
-	orderID, err := s.OrderRepository.CreateOrder(newOrder)
+	orderID := s.OrderRepository.CreateOrder(newOrder)
 	if err != nil {
+		fmt.Println(orderID)
 		return order, failure.InternalError(err)
 	}
 
