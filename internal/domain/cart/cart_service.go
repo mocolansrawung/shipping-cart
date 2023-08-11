@@ -13,7 +13,8 @@ import (
 type CartService interface {
 	EnsureCartExists(userID uuid.UUID) (cartID uuid.UUID, err error)
 	AddItemToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error)
-	ResolveByUserID(id uuid.UUID, withItems bool) (cart Cart, err error)
+	ResolveByUserID(id uuid.UUID) (cart Cart, err error)
+	ResolveDetailsByUserID(id uuid.UUID) (cart Cart, err error)
 }
 
 type CartServiceImpl struct {
@@ -32,7 +33,6 @@ func ProvideCartServiceImpl(cartRepository CartRepository, config *configs.Confi
 func (s *CartServiceImpl) EnsureCartExists(userID uuid.UUID) (cartID uuid.UUID, err error) {
 	exists, err := s.CartRepository.ExistsByUserID(userID)
 	if err != nil {
-		// logger.Error("Failed to check if cart exists:", err)
 		return
 	}
 
@@ -57,7 +57,6 @@ func (s *CartServiceImpl) EnsureCartExists(userID uuid.UUID) (cartID uuid.UUID, 
 
 	return
 }
-
 func (s *CartServiceImpl) AddItemToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error) {
 	cartItem, err = cartItem.NewCartItemFromRequestFormat(requestFormat, userID)
 	if err != nil {
@@ -100,8 +99,7 @@ func (s *CartServiceImpl) AddItemToCart(requestFormat CartItemRequestFormat, use
 
 	return
 }
-
-func (s *CartServiceImpl) ResolveByUserID(id uuid.UUID, withItems bool) (cart Cart, err error) {
+func (s *CartServiceImpl) ResolveByUserID(id uuid.UUID) (cart Cart, err error) {
 	cart, err = s.CartRepository.ResolveByUserID(id)
 	if err != nil {
 		return
@@ -111,15 +109,33 @@ func (s *CartServiceImpl) ResolveByUserID(id uuid.UUID, withItems bool) (cart Ca
 		return cart, failure.NotFound("cart")
 	}
 
-	if withItems {
-		var items []CartItem
-		items, err = s.CartRepository.ResolveItemsByCartID([]uuid.UUID{cart.ID})
-		if err != nil {
-			return cart, err
-		}
-
-		cart.AttachItems(items)
+	var items []CartItem
+	items, err = s.CartRepository.ResolveItemsByCartID([]uuid.UUID{cart.ID})
+	if err != nil {
+		return cart, err
 	}
+
+	cart.AttachItems(items)
+
+	return
+}
+func (s *CartServiceImpl) ResolveDetailsByUserID(id uuid.UUID) (cart Cart, err error) {
+	cart, err = s.CartRepository.ResolveByUserID(id)
+	if err != nil {
+		return
+	}
+
+	if cart.IsDeleted() {
+		return cart, failure.NotFound("cart")
+	}
+
+	var items []CartItem
+	items, err = s.CartRepository.ResolveDetailedItemsByCartID([]uuid.UUID{cart.ID})
+	if err != nil {
+		return cart, err
+	}
+
+	cart.AttachItems(items)
 
 	return
 }

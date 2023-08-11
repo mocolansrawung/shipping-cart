@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/evermos/boilerplate-go/internal/domain/order"
 	"github.com/evermos/boilerplate-go/shared"
 	"github.com/evermos/boilerplate-go/shared/failure"
 	"github.com/evermos/boilerplate-go/transport/http/middleware"
 	"github.com/evermos/boilerplate-go/transport/http/response"
 	"github.com/go-chi/chi"
-	"github.com/gofrs/uuid"
 )
 
 type OrderHandler struct {
@@ -34,10 +34,6 @@ func (h *OrderHandler) Router(r chi.Router) {
 }
 
 func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
-	// TODO implement checkout logic
-	// payload: payment method, shipping address
-	// url param: cart_id
-
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
 		response.WithError(w, failure.Unauthorized("Login needed"))
@@ -53,15 +49,7 @@ func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cartID, err := uuid.FromString(chi.URLParam(r, "cartID"))
-	if err != nil {
-		response.WithError(w, failure.InternalError(err))
-		return
-	}
-
-	// populate cartID to requestFormat
-
-	order, err := h.OrderService.Checkout(requestFormat, userID, cartID)
+	order, err := h.OrderService.Checkout(requestFormat, userID)
 	if err != nil {
 		response.WithError(w, err)
 		return

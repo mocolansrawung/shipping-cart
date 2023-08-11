@@ -30,19 +30,19 @@ func (h *CartHandler) Router(r chi.Router) {
 			// r.Use(h.AuthMiddleware.AdminRoleCheck)
 			r.Use(h.AuthMiddleware.ValidateAuth)
 			r.Post("/", h.AddToCart)
-			r.Get("/", h.GetCartByID)
+			r.Get("/", h.GetCartByUserID)
 		})
 	})
 }
 
-func (h *CartHandler) GetCartByID(w http.ResponseWriter, r *http.Request) {
+func (h *CartHandler) GetCartByUserID(w http.ResponseWriter, r *http.Request) {
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
 		response.WithError(w, failure.Unauthorized("Login needed"))
 	}
 	userID := claims.UserID
 
-	cart, err := h.CartService.ResolveByUserID(userID, true)
+	cart, err := h.CartService.ResolveByUserID(userID)
 	if err != nil {
 		response.WithError(w, err)
 		return

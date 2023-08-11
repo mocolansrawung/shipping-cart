@@ -2,9 +2,11 @@ package order
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/evermos/boilerplate-go/shared"
+	"github.com/evermos/boilerplate-go/shared/failure"
 	"github.com/evermos/boilerplate-go/shared/nuuid"
 	"github.com/gofrs/uuid"
 	"github.com/guregu/null"
@@ -42,15 +44,12 @@ func (o *Order) AttachItems(items []OrderItem) Order {
 	}
 	return *o
 }
-
 func (o *Order) IsDeleted() (deleted bool) {
 	return o.DeletedAt.Valid && o.DeletedBy.Valid
 }
-
 func (o Order) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.ToResponseFormat())
 }
-
 func (o Order) NewOrderFromRequestFormat(req OrderRequestFormat, userID uuid.UUID) (newOrder Order, err error) {
 	orderID, err := uuid.NewV4()
 	if err != nil {
@@ -60,7 +59,6 @@ func (o Order) NewOrderFromRequestFormat(req OrderRequestFormat, userID uuid.UUI
 	newOrder = Order{
 		ID:        orderID,
 		UserID:    userID,
-		TotalCost: req.TotalCost,
 		Status:    OrderStatusPending,
 		CreatedAt: time.Now(),
 		CreatedBy: userID,
@@ -69,7 +67,10 @@ func (o Order) NewOrderFromRequestFormat(req OrderRequestFormat, userID uuid.UUI
 	items := make([]OrderItem, 0)
 	for _, requestItem := range req.Items {
 		item := OrderItem{}
-		item = item.NewOrderItemFromRequestFormat(requestItem, userID)
+		item, err = item.NewFromRequestFormat(requestItem, orderID)
+		if err != nil {
+			return
+		}
 		items = append(items, item)
 	}
 	newOrder.Items = items
@@ -79,7 +80,6 @@ func (o Order) NewOrderFromRequestFormat(req OrderRequestFormat, userID uuid.UUI
 
 	return
 }
-
 func (o *Order) Recalculate() {
 	o.TotalCost = float64(0)
 	recalculatedItems := make([]OrderItem, 0)
@@ -91,12 +91,6 @@ func (o *Order) Recalculate() {
 
 	o.Items = recalculatedItems
 }
-
-func (o *Order) Validate() (err error) {
-	validator := shared.GetValidator()
-	return validator.Struct(o)
-}
-
 func (o Order) ToResponseFormat() OrderResponseFormat {
 	resp := OrderResponseFormat{
 		ID:        o.ID,
@@ -118,59 +112,107 @@ func (o Order) ToResponseFormat() OrderResponseFormat {
 
 	return resp
 }
+func (o *Order) UpdateStatus(newStatus OrderStatus) (err error) {
+	stateChangeNotAllowedError := failure.Conflict(
+		"stateChange",
+		"order",
+		fmt.Sprintf("cannot change from %s to %s", o.Status, newStatus))
+
+	switch o.Status {
+	case OrderStatusPending:
+		if newStatus != OrderStatusProcessing {
+			return stateChangeNotAllowedError
+		}
+	case OrderStatusProcessing:
+		if newStatus != OrderStatusShipped {
+			return stateChangeNotAllowedError
+		}
+	case OrderStatusShipped:
+		if newStatus != OrderStatusDelivered {
+			return stateChangeNotAllowedError
+		}
+	case OrderStatusDelivered, OrderStatusCanceled:
+		return stateChangeNotAllowedError
+	}
+
+	o.Status = newStatus
+
+	return nil
+}
+func (o *Order) Validate() (err error) {
+	validator := shared.GetValidator()
+	return validator.Struct(o)
+}
 
 type OrderRequestFormat struct {
-	ID        uuid.UUID   `json:"ID" validate:"required"`
-	TotalCost float64     `json:"totalCost" validate:"required"`
-	Status    OrderStatus `json:"orderStatus" validate:"required"`
-	Items     []OrderItem `json:"items" validate:"required,dive,required"`
+	TotalCost float64                  `json:"totalCost" validate:"required"`
+	Status    OrderStatus              `json:"orderStatus" validate:"required"`
+	Items     []OrderItemRequestFormat `json:"items" validate:"required,dive,required"`
 }
 
 type OrderResponseFormat struct {
-	ID        uuid.UUID   `json:"ID"`
-	UserID    uuid.UUID   `json:"userID"`
-	TotalCost float64     `json:"totalCost"`
-	Status    OrderStatus `json:"status"`
-	CreatedAt time.Time   `json:"createdAt"`
-	CreatedBy uuid.UUID   `json:"createdBy"`
-	UpdatedAt null.Time   `json:"updatedAt"`
-	UpdatedBy *uuid.UUID  `json:"updatedBy"`
-	DeletedAt null.Time   `json:"deletedAt,omitempty"`
-	DeletedBy *uuid.UUID  `json:"deletedBy,omitempty"`
-	Items     []OrderItem `json:"items"`
+	ID        uuid.UUID                 `json:"ID"`
+	UserID    uuid.UUID                 `json:"userID"`
+	TotalCost float64                   `json:"totalCost"`
+	Status    OrderStatus               `json:"status"`
+	CreatedAt time.Time                 `json:"createdAt"`
+	CreatedBy uuid.UUID                 `json:"createdBy"`
+	UpdatedAt null.Time                 `json:"updatedAt"`
+	UpdatedBy *uuid.UUID                `json:"updatedBy"`
+	DeletedAt null.Time                 `json:"deletedAt,omitempty"`
+	DeletedBy *uuid.UUID                `json:"deletedBy,omitempty"`
+	Items     []OrderItemResponseFormat `json:"items"`
 }
 
 // Order Item
 type OrderItem struct {
-	ID        uuid.UUID  `db:"id" validate:"required"`
-	OrderID   uuid.UUID  `db:"order_id" validate:"required"`
-	ProductID uuid.UUID  `db:"product_id" validate:"required"`
-	UnitPrice uuid.UUID  `db:"unit_price" validate:"required"`
-	Quantity  int        `db:"quantity" validate:"required"`
-	Cost      float64    `db:"cost" validate:"required"`
-	CreatedAt time.Time  `json:"createdAt"`
-	CreatedBy uuid.UUID  `json:"createdBy"`
-	UpdatedAt null.Time  `json:"updatedAt"`
-	UpdatedBy *uuid.UUID `json:"updatedBy"`
-	DeletedAt null.Time  `json:"deletedAt,omitempty"`
-	DeletedBy *uuid.UUID `json:"deletedBy,omitempty"`
+	OrderID   uuid.UUID   `db:"order_id" validate:"required"`
+	ProductID uuid.UUID   `db:"product_id" validate:"required"`
+	Quantity  int         `db:"quantity" validate:"required,min=1"`
+	UnitPrice float64     `db:"unit_price" validate:"required"`
+	Cost      float64     `db:"cost" validate:"required,min=0"`
+	CreatedAt time.Time   `db:"created_at"`
+	CreatedBy uuid.UUID   `db:"created_by"`
+	UpdatedAt null.Time   `db:"deleted_at"`
+	UpdatedBy nuuid.NUUID `db:"updated_by"`
+	DeletedAt null.Time   `db:"deleted_at"`
+	DeletedBy nuuid.NUUID `db:"deleted_by"`
 }
 
 func (oi OrderItem) MarshalJSON() ([]byte, error) {
 	return json.Marshal(oi.ToResponseFormat())
 }
 
-func (oi OrderItem) NewOrderItemFromRequestFormat(req OrderItemRequestFormat, userID uuid.UUID) (newOrderItem OrderItem, err error) {
+func (oi OrderItem) NewFromRequestFormat(format OrderItemRequestFormat, orderID uuid.UUID) (newOrderItem OrderItem, err error) {
 	newOrderItem = OrderItem{
-		OrderID:   req.OrderID,
-		ProductID: req.ProductID,
+		OrderID:   orderID,
+		ProductID: format.ProductID,
 	}
 
 	return
 }
 
+func (oi *OrderItem) Recalculate() {
+	oi.Cost = float64(oi.Quantity) * oi.UnitPrice
+}
+
+func (oi *OrderItem) ToResponseFormat() OrderItemResponseFormat {
+	return OrderItemResponseFormat{
+		OrderID:   oi.OrderID,
+		ProductID: oi.ProductID,
+		Quantity:  oi.Quantity,
+		UnitPrice: oi.UnitPrice,
+		Cost:      oi.Cost,
+		CreatedAt: oi.CreatedAt,
+		CreatedBy: oi.CreatedBy,
+		UpdatedAt: oi.UpdatedAt,
+		UpdatedBy: oi.UpdatedBy.Ptr(),
+		DeletedAt: oi.DeletedAt,
+		DeletedBy: oi.DeletedBy.Ptr(),
+	}
+}
+
 type OrderItemRequestFormat struct {
-	OrderID   uuid.UUID `json:"order_id" validate:"required"`
 	CartID    uuid.UUID `json:"cart_id" validate:"required"`
 	ProductID uuid.UUID `json:"product_id" validate:"required"`
 }
@@ -178,8 +220,8 @@ type OrderItemRequestFormat struct {
 type OrderItemResponseFormat struct {
 	OrderID   uuid.UUID  `json:"order_id"`
 	ProductID uuid.UUID  `json:"product_id"`
-	UnitPrice uuid.UUID  `json:"unit_price"`
 	Quantity  int        `json:"quantity"`
+	UnitPrice float64    `json:"unit_price"`
 	Cost      float64    `json:"cost"`
 	CreatedAt time.Time  `json:"createdAt"`
 	CreatedBy uuid.UUID  `json:"createdBy"`

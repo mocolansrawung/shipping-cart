@@ -90,6 +90,7 @@ type CartItem struct {
 	UnitPrice float64     `db:"unit_price" validate:"required"`
 	Quantity  int         `db:"quantity" validate:"required,min=1"`
 	Cost      float64     `db:"cost" validate:"required,min=0"`
+	Stock     int         `db:"stock"`
 	CreatedAt time.Time   `db:"created_at" validate:"required"`
 	CreatedBy uuid.UUID   `db:"created_by" validate:"required"`
 	UpdatedAt null.Time   `db:"updated_at"`
@@ -151,6 +152,7 @@ type CartItemResponseFormat struct {
 	UnitPrice float64    `json:"unitPrice"`
 	Quantity  int        `json:"quantity"`
 	Cost      float64    `json:"cost"`
+	Stock     int        `json:"-"`
 	CreatedAt time.Time  `json:"createdAt"`
 	CreatedBy uuid.UUID  `json:"createdBy"`
 	UpdatedAt null.Time  `json:"updatedAt"`

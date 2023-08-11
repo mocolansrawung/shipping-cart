@@ -72,6 +72,7 @@ type ProductRepository interface {
 	CreateProduct(product Product) (err error)
 	ResolveProductsByQuery(params ProductQueryParams) (products []Product, err error)
 	CountAllProducts() (total int, err error)
+	ResolveProductByID(id uuid.UUID) (product Product, err error)
 }
 
 type ProductRepositoryMySQL struct {
@@ -107,7 +108,6 @@ func (r *ProductRepositoryMySQL) CreateProduct(product Product) (err error) {
 		e <- nil
 	})
 }
-
 func (r *ProductRepositoryMySQL) ResolveProductsByQuery(params ProductQueryParams) (products []Product, err error) {
 	query := productQueries.selectProducts
 
@@ -165,7 +165,6 @@ func (r *ProductRepositoryMySQL) ResolveProductsByQuery(params ProductQueryParam
 
 	return products, nil
 }
-
 func (r *ProductRepositoryMySQL) CountAllProducts() (total int, err error) {
 	query := `SELECT COUNT(*) FROM product`
 
@@ -176,7 +175,6 @@ func (r *ProductRepositoryMySQL) CountAllProducts() (total int, err error) {
 
 	return total, nil
 }
-
 func (r *ProductRepositoryMySQL) ExistsByID(id uuid.UUID) (exists bool, err error) {
 	err = r.DB.Read.Get(
 		&exists,
@@ -185,6 +183,22 @@ func (r *ProductRepositoryMySQL) ExistsByID(id uuid.UUID) (exists bool, err erro
 
 	if err != nil {
 		logger.ErrorWithStack(err)
+	}
+
+	return
+}
+func (r *ProductRepositoryMySQL) ResolveProductByID(id uuid.UUID) (product Product, err error) {
+	query := `SELECT * FROM product`
+
+	err = r.DB.Read.Get(
+		&product,
+		query+" WHERE id = ?",
+		id.String())
+
+	if err != nil && err == sql.ErrNoRows {
+		err = failure.NotFound("product")
+		logger.ErrorWithStack(err)
+		return
 	}
 
 	return

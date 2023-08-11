@@ -127,6 +127,7 @@ type CartRepository interface {
 	AddItemToCart(cartItem CartItem, userID uuid.UUID) (err error)
 	ResolveByUserID(id uuid.UUID) (cart Cart, err error)
 	ResolveItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error)
+	ResolveDetailedItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error)
 	ExistsByUserID(id uuid.UUID) (exists bool, err error)
 	GetCartIDByUserID(userID uuid.UUID) (cartID uuid.UUID, err error)
 	GetPriceAndStockByProductID(productID uuid.UUID) (price float64, stock int, err error)
@@ -221,6 +222,27 @@ func (r *CartRepositoryMySQL) ResolveItemsByCartID(ids []uuid.UUID) (cartItems [
 
 	return
 }
+func (r *CartRepositoryMySQL) ResolveDetailedItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error) {
+	initialQuery := `SELECT cart_item.cart_id, cart_item.product_id, cart_item.unit_price, cart_item.quantity, cart_item.cost, cart_item.created_at, cart_item.created_by, cart_item.updated_at, cart_item.updated_by, cart_item.deleted_at, cart_item.deleted_by, product.stock FROM cart_item JOIN product ON cart_item.product_id = product.id;
+	`
+	if len(ids) == 0 {
+		return
+	}
+
+	query, args, err := sqlx.In(initialQuery+" WHERE cart_id IN (?)", ids)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return
+	}
+
+	err = r.DB.Read.Select(&cartItems, query, args...)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return
+	}
+
+	return
+}
 func (r *CartRepositoryMySQL) ItemExistsInCart(cartItem CartItem) (exists bool, err error) {
 	err = r.DB.Read.Get(
 		&exists,
@@ -275,7 +297,6 @@ func (r *CartRepositoryMySQL) ExistsByUserID(id uuid.UUID) (exists bool, err err
 
 	return
 }
-
 func (r *CartRepositoryMySQL) GetCartIDByUserID(userID uuid.UUID) (cartID uuid.UUID, err error) {
 	var id string
 	err = r.DB.Read.Get(&id, "SELECT entity_id FROM cart WHERE user_id = ?", userID.String())
