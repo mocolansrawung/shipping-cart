@@ -12,7 +12,7 @@ import (
 )
 
 type OrderRepository interface {
-	CreateOrder(order Order) (err error)
+	Checkout(order Order, cartID uuid.UUID) (err error)
 }
 
 type OrderRepositoryMySQL struct {
@@ -26,8 +26,7 @@ func ProvideOrderRepositoryMySQL(db *infras.MySQLConn) *OrderRepositoryMySQL {
 	return s
 }
 
-func (r *OrderRepositoryMySQL) CreateOrder(order Order) (err error) {
-	// Implement CreateOrder without RequestFormat or hit the endpoint, it's an automatated process that involved in the flow of Checkout endpoint.
+func (r *OrderRepositoryMySQL) Checkout(order Order, cartID uuid.UUID) (err error) {
 	exists, err := r.ExistsByID(order.ID)
 	if err != nil {
 		logger.ErrorWithStack(err)
@@ -40,13 +39,23 @@ func (r *OrderRepositoryMySQL) CreateOrder(order Order) (err error) {
 		return
 	}
 
+	var productIDs []uuid.UUID
+	for _, item := range order.Items {
+		productIDs = append(productIDs, item.ProductID)
+	}
+
 	return r.DB.WithTransaction(func(tx *sqlx.Tx, e chan error) {
-		if err := r.txCreate(tx, order); err != nil {
-			e <- nil
+		if err := r.txCreateOrder(tx, order); err != nil {
+			e <- err
 			return
 		}
 
-		if err := r.txCreateItems(tx, order.Items); err != nil {
+		if err := r.txTransferItemsToOrder(tx, order.Items); err != nil {
+			e <- err
+			return
+		}
+
+		if err := r.txRemoveCheckedOutCartItems(tx, cartID, productIDs); err != nil {
 			e <- err
 			return
 		}
@@ -125,4 +134,53 @@ func (r *OrderRepositoryMySQL) txCreateItems(tx *sqlx.Tx, orderItems []OrderItem
 	}
 
 	return
+}
+func (r *OrderRepositoryMySQL) txCreateOrder(tx *sqlx.Tx, order Order) error {
+	// Assuming your Order table's insert query goes here.
+	query := `INSERT INTO orders (/* Your columns here */) VALUES (/* :named_parameters here */)`
+	stmt, err := tx.PrepareNamed(query)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(order)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return err
+	}
+	return nil
+}
+func (r *OrderRepositoryMySQL) txTransferItemsToOrder(tx *sqlx.Tx, orderItems []OrderItem) error {
+	return r.txCreateItems(tx, orderItems)
+}
+func (r *OrderRepositoryMySQL) txRemoveCheckedOutCartItems(tx *sqlx.Tx, cartID uuid.UUID, productIDs []uuid.UUID) error {
+	if len(productIDs) == 0 {
+		return nil
+	}
+
+	query := `DELETE FROM cart_items WHERE cart_id = ? AND product_id IN (?)`
+	query, args, err := sqlx.In(query, cartID, productIDs)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return err
+	}
+
+	query = tx.Rebind(query)
+
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(args...)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return err
+	}
+
+	return nil
 }

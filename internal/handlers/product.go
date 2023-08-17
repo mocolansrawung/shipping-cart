@@ -27,7 +27,6 @@ func ProvideProductHandler(productService product.ProductService, authMiddleware
 func (h *ProductHandler) Router(r chi.Router) {
 	r.Route("/products", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			// r.Use(h.AuthMiddleware.UserRoleCheck)
 			r.Use(h.AuthMiddleware.ValidateAuth)
 			r.Get("/", h.ResolveProducts)
 			r.Post("/", h.CreateProduct)

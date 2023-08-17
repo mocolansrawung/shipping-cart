@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/evermos/boilerplate-go/internal/domain/order"
@@ -25,15 +26,16 @@ func ProvideOrderHandler(orderService order.OrderService, authMiddleware *middle
 }
 
 func (h *OrderHandler) Router(r chi.Router) {
-	r.Route("/carts", func(r chi.Router) {
+	r.Route("/orders", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(h.AuthMiddleware.ValidateAuth)
-			r.Post("/checkout", h.Checkout)
+			r.Post("/checkout", h.CheckoutOrder)
 		})
 	})
 }
 
-func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
+func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
+	// extract the variables needed
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
 		response.WithError(w, failure.Unauthorized("Login needed"))
@@ -49,6 +51,9 @@ func (h *OrderHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(requestFormat)
+
+	// call the service layer to create the order
 	order, err := h.OrderService.Checkout(requestFormat, userID)
 	if err != nil {
 		response.WithError(w, err)

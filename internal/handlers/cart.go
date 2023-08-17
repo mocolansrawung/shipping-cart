@@ -27,7 +27,6 @@ func ProvideCartHandler(cartService cart.CartService, authMiddleware *middleware
 func (h *CartHandler) Router(r chi.Router) {
 	r.Route("/carts", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			// r.Use(h.AuthMiddleware.AdminRoleCheck)
 			r.Use(h.AuthMiddleware.ValidateAuth)
 			r.Post("/", h.AddToCart)
 			r.Get("/", h.GetCartByUserID)
