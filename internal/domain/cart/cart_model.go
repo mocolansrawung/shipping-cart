@@ -52,7 +52,7 @@ func (c Cart) NewFromRequestFormat(userID uuid.UUID) (newCart Cart, err error) {
 		CreatedBy: userID,
 	}
 
-	err = newCart.Validate()
+	// err = newCart.Validate()
 
 	return
 }

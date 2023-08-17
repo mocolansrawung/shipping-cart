@@ -9,8 +9,9 @@ import (
 )
 
 type CartService interface {
-	AddToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cart Cart, err error)
+	AddToCart(requestFormat CartItemRequestFormat, userID uuid.UUID) (cartItem CartItem, err error)
 	ResolveByUserID(id uuid.UUID) (cart Cart, err error)
+	ResolveDetailsByUserID(id uuid.UUID) (cart Cart, err error)
 }
 
 type CartServiceImpl struct {
@@ -58,11 +59,14 @@ func (s *CartServiceImpl) AddToCart(requestFormat CartItemRequestFormat, userID 
 
 	if found {
 		existingCartItem.Quantity += requestFormat.Quantity
+		existingCartItem.Cost = float64(existingCartItem.Quantity) * existingCartItem.UnitPrice
 		err = s.CartRepository.UpdateItemQuantity(existingCartItem)
 		if err != nil {
 			logger.ErrorWithStack(err)
 			return cartItem, failure.InternalError(err)
 		}
+
+		cartItem = existingCartItem
 	} else {
 		err = s.CartRepository.CreateCartItem(cartItem, userID)
 		if err != nil {
@@ -85,6 +89,26 @@ func (s *CartServiceImpl) ResolveByUserID(id uuid.UUID) (cart Cart, err error) {
 
 	var items []CartItem
 	items, err = s.CartRepository.ResolveItemsByCartID([]uuid.UUID{cart.ID})
+	if err != nil {
+		return cart, err
+	}
+
+	cart.AttachItems(items)
+
+	return
+}
+func (s *CartServiceImpl) ResolveDetailsByUserID(id uuid.UUID) (cart Cart, err error) {
+	cart, err = s.CartRepository.ResolveCartByUserID(id)
+	if err != nil {
+		return
+	}
+
+	if cart.IsDeleted() {
+		return cart, failure.NotFound("cart")
+	}
+
+	var items []CartItem
+	items, err = s.CartRepository.ResolveDetailedItemsByCartID([]uuid.UUID{cart.ID})
 	if err != nil {
 		return cart, err
 	}

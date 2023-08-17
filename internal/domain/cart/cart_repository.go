@@ -17,10 +17,11 @@ type CartRepository interface {
 	ResolveCartByUserID(id uuid.UUID) (cart Cart, err error)
 	ResolveItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error)
 	ResolveOrCreateCartByUserID(userID uuid.UUID) (cart Cart, err error)
-	CreateCartByUserID(userID uuid.UUID) (cart Cart, err error)
+	CreateCart(cart Cart) (err error)
 	ResolveCartItemByProductID(cartID, productID uuid.UUID) (cartItem CartItem, found bool, err error)
 	UpdateItemQuantity(cartItem CartItem) (err error)
 	CreateCartItem(cartItem CartItem, userID uuid.UUID) (err error)
+	ResolveDetailedItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error)
 }
 
 type CartRepositoryMySQL struct {
@@ -44,6 +45,7 @@ func (r *CartRepositoryMySQL) ResolveCartByUserID(id uuid.UUID) (cart Cart, err 
 	if err != nil && err == sql.ErrNoRows {
 		err = failure.NotFound("cart")
 		logger.ErrorWithStack(err)
+		return
 	} else if err != nil {
 		logger.ErrorWithStack(err)
 		return
@@ -154,6 +156,27 @@ func (r *CartRepositoryMySQL) CreateCartItem(cartItem CartItem, userID uuid.UUID
 		e <- nil
 	})
 }
+func (r *CartRepositoryMySQL) ResolveDetailedItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error) {
+	initialQuery := `SELECT cart_item.cart_id, cart_item.product_id, cart_item.unit_price, cart_item.quantity, cart_item.cost, cart_item.created_at, cart_item.created_by, cart_item.updated_at, cart_item.updated_by, cart_item.deleted_at, cart_item.deleted_by, product.stock FROM cart_item JOIN product ON cart_item.product_id = product.id;
+	`
+	if len(ids) == 0 {
+		return
+	}
+
+	query, args, err := sqlx.In(initialQuery+" WHERE cart_id IN (?)", ids)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return
+	}
+
+	err = r.DB.Read.Select(&cartItems, query, args...)
+	if err != nil {
+		logger.ErrorWithStack(err)
+		return
+	}
+
+	return
+}
 
 // Transactions
 func (r *CartRepositoryMySQL) txCreate(tx *sqlx.Tx, cart Cart) (err error) {
@@ -174,7 +197,7 @@ func (r *CartRepositoryMySQL) txCreate(tx *sqlx.Tx, cart Cart) (err error) {
 	return
 }
 func (r *CartRepositoryMySQL) composeBulkInsertItemQuery(cartItems []CartItem) (query string, params []interface{}, err error) {
-	insertCartItemBulk := `INSERT INTO cart_item (id, cart_id, product_id, unit_price, quantity, cost, created_at, created_by, updated_at, updated_by, deleted_at, deleted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	insertCartItemBulk := `INSERT INTO cart_item (id, cart_id, product_id, unit_price, quantity, cost, created_at, created_by, updated_at, updated_by, deleted_at, deleted_by) VALUES `
 	insertCartItemBulkPlaceholder := `(:id, :cart_id, :product_id, :unit_price, :quantity, :cost, :created_at, :created_by, :updated_at, :updated_by, :deleted_at, :deleted_by)`
 
 	values := []string{}
@@ -227,7 +250,7 @@ func (r *CartRepositoryMySQL) txCreateItems(tx *sqlx.Tx, cartItems []CartItem) (
 	return
 }
 func (r *CartRepositoryMySQL) txUpdate(tx *sqlx.Tx, cartItem CartItem) (err error) {
-	updateQuery := `UPDATE cart_item SET id = :id, cart_id = :cart_id, product_id = :product_id, unit_price = :unit_price, quantity = :quantity, cost = :cost, created_at = :created_at, created_by = :created_by, updated_at = :updated_at, updated_by = :updated_by, deleted_at = :deleted_at, deleted_by = :deleted_by`
+	updateQuery := `UPDATE cart_item SET id = :id, cart_id = :cart_id, product_id = :product_id, unit_price = :unit_price, quantity = :quantity, cost = :cost, created_at = :created_at, created_by = :created_by, updated_at = :updated_at, updated_by = :updated_by, deleted_at = :deleted_at, deleted_by = :deleted_by WHERE id = :id`
 	stmt, err := tx.PrepareNamed(updateQuery)
 	if err != nil {
 		logger.ErrorWithStack(err)
