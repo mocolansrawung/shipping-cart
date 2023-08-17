@@ -33,15 +33,29 @@ func (c *Cart) AttachItems(items []CartItem) Cart {
 
 	return *c
 }
-
 func (c Cart) IsDeleted() (deleted bool) {
 	return c.DeletedAt.Valid && c.DeletedBy.Valid
 }
-
 func (c Cart) MarshalJSON() ([]byte, error) {
 	return json.Marshal(c.ToResponseFormat())
 }
+func (c Cart) NewFromRequestFormat(userID uuid.UUID) (newCart Cart, err error) {
+	cartID, err := uuid.NewV4()
+	if err != nil {
+		return
+	}
 
+	newCart = Cart{
+		ID:        cartID,
+		UserID:    userID,
+		CreatedAt: time.Now(),
+		CreatedBy: userID,
+	}
+
+	err = newCart.Validate()
+
+	return
+}
 func (c Cart) ToResponseFormat() CartResponseFormat {
 	resp := CartResponseFormat{
 		ID:        c.ID,
@@ -60,15 +74,9 @@ func (c Cart) ToResponseFormat() CartResponseFormat {
 
 	return resp
 }
-
 func (c *Cart) Validate() (err error) {
 	validator := shared.GetValidator()
 	return validator.Struct(c)
-}
-
-type CartRequestFormat struct {
-	ID    uuid.UUID               `json:"id" validate:"required"`
-	Items []CartItemRequestFormat `json:"items" validate:"required,dive,required"`
 }
 
 type CartResponseFormat struct {
@@ -83,8 +91,9 @@ type CartResponseFormat struct {
 	Items     []CartItemResponseFormat `json:"items"`
 }
 
-// Cart Item
+// CartItem
 type CartItem struct {
+	ID        uuid.UUID   `db:"id"`
 	CartID    uuid.UUID   `db:"cart_id" validate:"required"`
 	ProductID uuid.UUID   `db:"product_id" validate:"required"`
 	UnitPrice float64     `db:"unit_price" validate:"required"`
@@ -102,30 +111,36 @@ type CartItem struct {
 func (ci CartItem) MarshalJSON() ([]byte, error) {
 	return json.Marshal(ci.ToResponseFormat())
 }
+func (ci CartItem) NewFromRequestFormat(req CartItemRequestFormat, userID uuid.UUID, cartID uuid.UUID, price float64) (newCartItem CartItem, err error) {
+	cartItemID, err := uuid.NewV4()
+	if err != nil {
+		return
+	}
 
-func (ci CartItem) NewCartItemFromRequestFormat(req CartItemRequestFormat, userID uuid.UUID) (newCartItem CartItem, err error) {
 	newCartItem = CartItem{
-		CartID:    req.CartID,
+		ID:        cartItemID,
+		CartID:    cartID,
 		ProductID: req.ProductID,
+		UnitPrice: price,
 		Quantity:  req.Quantity,
 		CreatedAt: time.Now(),
 		CreatedBy: userID,
 	}
 
+	newCartItem.Recalculate()
+
 	return
 }
-
 func (ci *CartItem) Validate() (err error) {
 	validator := shared.GetValidator()
 	return validator.Struct(ci)
 }
-
 func (ci *CartItem) Recalculate() {
 	ci.Cost = math.Round(float64(ci.Quantity)*ci.UnitPrice*100) / 100
 }
-
 func (ci *CartItem) ToResponseFormat() CartItemResponseFormat {
 	return CartItemResponseFormat{
+		ID:        ci.ID,
 		CartID:    ci.CartID,
 		ProductID: ci.ProductID,
 		UnitPrice: ci.UnitPrice,
@@ -141,13 +156,12 @@ func (ci *CartItem) ToResponseFormat() CartItemResponseFormat {
 }
 
 type CartItemRequestFormat struct {
-	CartID    uuid.UUID `json:"cartID" validate:"required"`
 	ProductID uuid.UUID `json:"productID" validate:"required"`
 	Quantity  int       `json:"quantity" validate:"required,min=1"`
 }
-
 type CartItemResponseFormat struct {
-	CartID    uuid.UUID  `json:"cartID"`
+	ID        uuid.UUID  `json:"ID"`
+	CartID    uuid.UUID  `json:"-"`
 	ProductID uuid.UUID  `json:"productID"`
 	UnitPrice float64    `json:"unitPrice"`
 	Quantity  int        `json:"quantity"`

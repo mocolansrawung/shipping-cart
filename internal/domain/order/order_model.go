@@ -50,7 +50,7 @@ func (o *Order) IsDeleted() (deleted bool) {
 func (o Order) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.ToResponseFormat())
 }
-func (o Order) NewOrderFromRequestFormat(req OrderRequestFormat, userID uuid.UUID) (newOrder Order, err error) {
+func (o Order) NewFromRequestFormat(req OrderRequestFormat, userID uuid.UUID) (newOrder Order, err error) {
 	orderID, err := uuid.NewV4()
 	if err != nil {
 		return
@@ -145,11 +145,8 @@ func (o *Order) Validate() (err error) {
 }
 
 type OrderRequestFormat struct {
-	TotalCost float64                  `json:"totalCost" validate:"required"`
-	Status    OrderStatus              `json:"orderStatus" validate:"required"`
-	Items     []OrderItemRequestFormat `json:"items" validate:"required,dive,required"`
+	Items []OrderItemRequestFormat `json:"items" validate:"required,dive,required"`
 }
-
 type OrderResponseFormat struct {
 	ID        uuid.UUID                 `json:"ID"`
 	UserID    uuid.UUID                 `json:"userID"`
@@ -166,36 +163,39 @@ type OrderResponseFormat struct {
 
 // Order Item
 type OrderItem struct {
-	OrderID   uuid.UUID   `db:"order_id" validate:"required"`
-	ProductID uuid.UUID   `db:"product_id" validate:"required"`
-	Quantity  int         `db:"quantity" validate:"required,min=1"`
-	UnitPrice float64     `db:"unit_price" validate:"required"`
-	Cost      float64     `db:"cost" validate:"required,min=0"`
-	CreatedAt time.Time   `db:"created_at"`
-	CreatedBy uuid.UUID   `db:"created_by"`
-	UpdatedAt null.Time   `db:"deleted_at"`
-	UpdatedBy nuuid.NUUID `db:"updated_by"`
-	DeletedAt null.Time   `db:"deleted_at"`
-	DeletedBy nuuid.NUUID `db:"deleted_by"`
+	CartItemID uuid.UUID   `db:"-" validate:"required"`
+	OrderID    uuid.UUID   `db:"order_id" validate:"required"`
+	ProductID  uuid.UUID   `db:"product_id" validate:"required"`
+	Quantity   int         `db:"quantity" validate:"required,min=1"`
+	UnitPrice  float64     `db:"unit_price" validate:"required"`
+	Cost       float64     `db:"cost" validate:"required,min=0"`
+	CreatedAt  time.Time   `db:"created_at"`
+	CreatedBy  uuid.UUID   `db:"created_by"`
+	UpdatedAt  null.Time   `db:"deleted_at"`
+	UpdatedBy  nuuid.NUUID `db:"updated_by"`
+	DeletedAt  null.Time   `db:"deleted_at"`
+	DeletedBy  nuuid.NUUID `db:"deleted_by"`
 }
 
 func (oi OrderItem) MarshalJSON() ([]byte, error) {
 	return json.Marshal(oi.ToResponseFormat())
 }
-
 func (oi OrderItem) NewFromRequestFormat(format OrderItemRequestFormat, orderID uuid.UUID) (newOrderItem OrderItem, err error) {
+	itemID, err := uuid.NewV4()
+	if err != nil {
+		return
+	}
+
 	newOrderItem = OrderItem{
-		OrderID:   orderID,
-		ProductID: format.ProductID,
+		CartItemID: itemID,
+		OrderID:    orderID,
 	}
 
 	return
 }
-
 func (oi *OrderItem) Recalculate() {
 	oi.Cost = float64(oi.Quantity) * oi.UnitPrice
 }
-
 func (oi *OrderItem) ToResponseFormat() OrderItemResponseFormat {
 	return OrderItemResponseFormat{
 		OrderID:   oi.OrderID,
@@ -213,15 +213,13 @@ func (oi *OrderItem) ToResponseFormat() OrderItemResponseFormat {
 }
 
 type OrderItemRequestFormat struct {
-	CartID    uuid.UUID `json:"cart_id" validate:"required"`
-	ProductID uuid.UUID `json:"product_id" validate:"required"`
+	CartItemID uuid.UUID `json:"CartItemID" validate:"required"`
 }
-
 type OrderItemResponseFormat struct {
-	OrderID   uuid.UUID  `json:"order_id"`
-	ProductID uuid.UUID  `json:"product_id"`
+	OrderID   uuid.UUID  `json:"-"`
+	ProductID uuid.UUID  `json:"productID"`
 	Quantity  int        `json:"quantity"`
-	UnitPrice float64    `json:"unit_price"`
+	UnitPrice float64    `json:"unitPrice"`
 	Cost      float64    `json:"cost"`
 	CreatedAt time.Time  `json:"createdAt"`
 	CreatedBy uuid.UUID  `json:"createdBy"`

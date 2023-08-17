@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/evermos/boilerplate-go/internal/domain/order"
@@ -36,6 +35,7 @@ func (h *OrderHandler) Router(r chi.Router) {
 
 func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
 	// extract the variables needed
+	// from context
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
 		response.WithError(w, failure.Unauthorized("Login needed"))
@@ -43,6 +43,7 @@ func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := claims.UserID
 
+	// from request body
 	decoder := json.NewDecoder(r.Body)
 	var requestFormat order.OrderRequestFormat
 	err := decoder.Decode(&requestFormat)
@@ -51,7 +52,12 @@ func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(requestFormat)
+	// validator
+	err = shared.GetValidator().Struct(requestFormat)
+	if err != nil {
+		response.WithError(w, failure.BadRequest(err))
+		return
+	}
 
 	// call the service layer to create the order
 	order, err := h.OrderService.Checkout(requestFormat, userID)

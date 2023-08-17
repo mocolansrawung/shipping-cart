@@ -43,10 +43,12 @@ type ProductQueryParams struct {
 	Category string
 }
 
+func (p *Product) IsDeleted() (deleted bool) {
+	return p.DeletedAt.Valid && p.DeletedBy.Valid
+}
 func (p Product) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.ToResponseFormat())
 }
-
 func (p Product) NewProductFromRequestFormat(req ProductRequestFormat, userID uuid.UUID) (newProduct Product, err error) {
 	productID, err := uuid.NewV4()
 
@@ -66,12 +68,10 @@ func (p Product) NewProductFromRequestFormat(req ProductRequestFormat, userID uu
 
 	return
 }
-
 func (p *Product) Validate() (err error) {
 	validator := shared.GetValidator()
 	return validator.Struct(p)
 }
-
 func (p Product) ToResponseFormat() ProductResponseFormat {
 	return ProductResponseFormat{
 		ID:        p.ID,

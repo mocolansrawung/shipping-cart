@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/evermos/boilerplate-go/configs"
 	"github.com/evermos/boilerplate-go/internal/domain/cart"
 	"github.com/evermos/boilerplate-go/internal/domain/product"
+	"github.com/evermos/boilerplate-go/shared/failure"
 	"github.com/gofrs/uuid"
 )
 
@@ -33,51 +33,65 @@ func ProvideOrderServiceImpl(orderRepository OrderRepository, cartService cart.C
 }
 
 func (s *OrderServiceImpl) Checkout(requestFormat OrderRequestFormat, userID uuid.UUID) (order Order, err error) {
+	// retrieve cart details
 	cart, err := s.CartService.ResolveDetailsByUserID(userID)
 	if err != nil {
 		return
 	}
 
+	// handling empty cart
 	if len(cart.Items) == 0 {
 		err = errors.New("cart is empty")
 		return order, err
 	}
 
+	// handling insufficient product stock
 	var insufficientStockProducts []string
 	for _, item := range cart.Items {
 		if item.Stock < item.Quantity {
 			insufficientStockProducts = append(insufficientStockProducts, item.ProductID.String())
 		}
 	}
-
 	if len(insufficientStockProducts) > 0 {
 		err = errors.New(fmt.Sprintf("Insufficient stock for products with IDs: %s", strings.Join(insufficientStockProducts, ", ")))
 		return order, err
 	}
 
-	var orderItems []OrderItem
-	for _, cartItem := range cart.Items {
-		orderItem := OrderItem{
-			ProductID: cartItem.ProductID,
-			UnitPrice: cartItem.UnitPrice,
-			Quantity:  cartItem.Quantity,
-			Cost:      cartItem.Cost,
-			CreatedAt: time.Now(),
-			CreatedBy: userID,
-		}
-		orderItems = append(orderItems, orderItem)
+	// must utilized request format
+	order, err = order.NewFromRequestFormat(requestFormat, userID)
+	if err != nil {
+		return
 	}
 
-	newOrder := Order{
-		UserID:    userID,
-		TotalCost: 0,
-		Status:    OrderStatusPending,
-		Items:     orderItems,
+	if err != nil {
+		return order, failure.BadRequest(err)
 	}
 
-	// call repo service to implement checkout
-	// fix later
-	err = s.OrderRepository.Checkout(newOrder, cart.ID)
+	err = s.OrderRepository.Checkout(order, cart.ID)
 
 	return
+
+	// populate items and totalcost
+	// order ID must be created -> fix this later
+	// var orderItems []OrderItem
+	// var totalCost float64
+	// for _, cartItem := range cart.Items {
+	// 	orderItem := OrderItem{
+	// 		ProductID: cartItem.ProductID,
+	// 		UnitPrice: cartItem.UnitPrice,
+	// 		Quantity:  cartItem.Quantity,
+	// 		Cost:      cartItem.Cost,
+	// 		CreatedAt: time.Now(),
+	// 		CreatedBy: userID,
+	// 	}
+	// 	orderItems = append(orderItems, orderItem)
+	// 	totalCost += cartItem.Cost
+	// }
+
+	// newOrder := Order{
+	// 	UserID:    userID,
+	// 	TotalCost: totalCost,
+	// 	Status:    OrderStatusPending,
+	// 	Items:     orderItems,
+	// }
 }

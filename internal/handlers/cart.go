@@ -49,7 +49,6 @@ func (h *CartHandler) GetCartByUserID(w http.ResponseWriter, r *http.Request) {
 
 	response.WithJSON(w, http.StatusOK, cart)
 }
-
 func (h *CartHandler) AddToCart(w http.ResponseWriter, r *http.Request) {
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
@@ -66,22 +65,15 @@ func (h *CartHandler) AddToCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cartID, err := h.CartService.EnsureCartExists(userID)
-	if err != nil {
-		response.WithError(w, failure.BadRequest(err))
-	}
-
-	requestFormat.CartID = cartID
-
 	err = shared.GetValidator().Struct(requestFormat)
 	if err != nil {
 		response.WithError(w, failure.BadRequest(err))
 		return
 	}
 
-	item, err := h.CartService.AddItemToCart(requestFormat, userID)
+	item, err := h.CartService.AddToCart(requestFormat, userID)
 	if err != nil {
-		response.WithError(w, err)
+		response.WithError(w, failure.InternalError(err))
 		return
 	}
 

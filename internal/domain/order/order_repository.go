@@ -13,6 +13,7 @@ import (
 
 type OrderRepository interface {
 	Checkout(order Order, cartID uuid.UUID) (err error)
+	ExistsByID(id uuid.UUID) (exists bool, err error)
 }
 
 type OrderRepositoryMySQL struct {

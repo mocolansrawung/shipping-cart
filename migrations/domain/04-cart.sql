@@ -10,6 +10,7 @@ CREATE TABLE `cart` (
 );
 
 CREATE TABLE `cart_item` (
+  `id` VARCHAR(55) PRIMARY KEY NOT NULL,
   `cart_id` VARCHAR(55) NOT NULL,
   `product_id` VARCHAR(55) NOT NULL,
   `unit_price` DECIMAL(10,2) NOT NULL,
@@ -22,12 +23,13 @@ CREATE TABLE `cart_item` (
   `deleted_at` TIMESTAMP NULL DEFAULT NULL,
   `deleted_by` VARCHAR(55) NULL DEFAULT NULL,
   CONSTRAINT `fk_cart_item_cart` FOREIGN KEY (`cart_id`) REFERENCES `cart`(`id`),
-  CONSTRAINT `fk_cart_item_product` FOREIGN KEY (`product_id`) REFERENCES `product`(`id`)
+  CONSTRAINT `fk_cart_item_product` FOREIGN KEY (`product_id`) REFERENCES `product`(`id`),
+  INDEX `idx_cart_item_cart_product` (`cart_id`, `product_id`)
 );
 
 -- Insert a cart for the user
 INSERT INTO `cart` (`id`, `user_id`, `created_by`)
-VALUES ('c1234567-89ab-cdef-0123-456789abcdef', '2407ae50-3a74-49f9-876c-ecef1087229f', 'syst2407ae50-3a74-49f9-876c-ecef1087229fem');
+VALUES ('c1234567-89ab-cdef-0123-456789abcdef', '2407ae50-3a74-49f9-876c-ecef1087229f', '2407ae50-3a74-49f9-876c-ecef1087229f');
 
 -- Insert multiple items into the cart
 -- Assuming the product IDs: 'p1', 'p2', 'p3' exist in the `product` table
