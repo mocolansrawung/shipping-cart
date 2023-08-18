@@ -46,7 +46,7 @@ func (h *ProductHandler) Router(r chi.Router) {
 // @Param brand query string false "Filter by brand"
 // @Param category query string false "Filter by category"
 // @Produce json
-// @Success 200 {object} response.Base{data=ProductPaginationResponse}
+// @Success 200 {object} response.Base{data=product.ProductResponseFormat}
 // @Failure 400 {object} response.Base
 // @Failure 401 {object} response.Base
 // @Failure 500 {object} response.Base
@@ -89,9 +89,9 @@ func (h *ProductHandler) ResolveProducts(w http.ResponseWriter, r *http.Request)
 // @Description This endpoint creates a new product.
 // @Tags products
 // @Security EVMOauthToken
-// @Param product body ProductRequestFormat true "The product to be created."
+// @Param product body product.ProductRequestFormat true "The product to be created."
 // @Produce json
-// @Success 201 {object} response.Base{data=ProductResponseFormat}
+// @Success 201 {object} response.Base{data=product.ProductResponseFormat}
 // @Failure 400 {object} response.Base
 // @Failure 401 {object} response.Base
 // @Failure 500 {object} response.Base

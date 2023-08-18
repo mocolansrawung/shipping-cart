@@ -38,9 +38,9 @@ func (h *OrderHandler) Router(r chi.Router) {
 // @Description This endpoint checks out the user's cart, creates an order, and returns the order details.
 // @Tags order
 // @Security EVMOauthToken
-// @Param order body OrderRequestFormat true "The order details and items."
+// @Param order body order.OrderRequestFormat true "The order details and items."
 // @Produce json
-// @Success 201 {object} response.Base{data=OrderResponseFormat}
+// @Success 201 {object} response.Base{data=order.OrderResponseFormat}
 // @Failure 400 {object} response.Base
 // @Failure 401 {object} response.Base
 // @Failure 500 {object} response.Base

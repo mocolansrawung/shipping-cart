@@ -38,12 +38,12 @@ func (h *CartHandler) Router(r chi.Router) {
 // @Summary Retrieve the cart for the current user.
 // @Description This endpoint retrieves the cart for the current authenticated user.
 // @Tags cart
-// @Security EVMOauthToken
+// @Security JWTAuth
 // @Produce json
-// @Success 200 {object} response.Base{data=CartResponseFormat}
+// @Success 200 {object} response.Base{data=cart.CartResponseFormat}
 // @Failure 401 {object} response.Base
 // @Failure 500 {object} response.Base
-// @Router /v1/cart [get]
+// @Router /v1/carts [get]
 func (h *CartHandler) GetCartByUserID(w http.ResponseWriter, r *http.Request) {
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
@@ -65,13 +65,13 @@ func (h *CartHandler) GetCartByUserID(w http.ResponseWriter, r *http.Request) {
 // @Description This endpoint adds an item to the cart of the current authenticated user.
 // @Tags cart
 // @Security EVMOauthToken
-// @Param item body CartItemRequestFormat true "The item to be added to the cart."
+// @Param item body cart.CartItemRequestFormat true "The item to be added to the cart."
 // @Produce json
-// @Success 201 {object} response.Base{data=CartItemResponseFormat}
+// @Success 201 {object} response.Base{data=cart.CartItemResponseFormat}
 // @Failure 400 {object} response.Base
 // @Failure 401 {object} response.Base
 // @Failure 500 {object} response.Base
-// @Router /v1/cart [post]
+// @Router /v1/carts [post]
 func (h *CartHandler) AddToCart(w http.ResponseWriter, r *http.Request) {
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
