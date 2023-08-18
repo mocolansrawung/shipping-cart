@@ -33,9 +33,19 @@ func (h *OrderHandler) Router(r chi.Router) {
 	})
 }
 
+// CheckoutOrder checks out the user's cart and creates an order.
+// @Summary Checkout the user's cart and create an order.
+// @Description This endpoint checks out the user's cart, creates an order, and returns the order details.
+// @Tags order
+// @Security EVMOauthToken
+// @Param order body OrderRequestFormat true "The order details and items."
+// @Produce json
+// @Success 201 {object} response.Base{data=OrderResponseFormat}
+// @Failure 400 {object} response.Base
+// @Failure 401 {object} response.Base
+// @Failure 500 {object} response.Base
+// @Router /v1/orders/checkout [post]
 func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
-	// extract the variables needed
-	// from context
 	claims, ok := r.Context().Value("claims").(shared.Claims)
 	if !ok {
 		response.WithError(w, failure.Unauthorized("Login needed"))
@@ -43,7 +53,6 @@ func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := claims.UserID
 
-	// from request body
 	decoder := json.NewDecoder(r.Body)
 	var requestFormat order.OrderRequestFormat
 	err := decoder.Decode(&requestFormat)
@@ -52,14 +61,12 @@ func (h *OrderHandler) CheckoutOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// validator
 	err = shared.GetValidator().Struct(requestFormat)
 	if err != nil {
 		response.WithError(w, failure.BadRequest(err))
 		return
 	}
 
-	// call the service layer to create the order
 	order, err := h.OrderService.Checkout(requestFormat, userID)
 	if err != nil {
 		response.WithError(w, err)

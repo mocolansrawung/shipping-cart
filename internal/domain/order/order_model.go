@@ -76,7 +76,6 @@ func (o Order) NewFromRequestFormat(req OrderRequestFormat, userID uuid.UUID) (n
 	newOrder.Items = items
 
 	newOrder.Recalculate()
-	err = newOrder.Validate()
 
 	return
 }
@@ -213,7 +212,7 @@ func (oi *OrderItem) ToResponseFormat() OrderItemResponseFormat {
 }
 
 type OrderItemRequestFormat struct {
-	CartItemID uuid.UUID `json:"CartItemID" validate:"required"`
+	CartItemID uuid.UUID `json:"cartItemID" validate:"required"`
 }
 type OrderItemResponseFormat struct {
 	OrderID   uuid.UUID  `json:"-"`

@@ -1,4 +1,4 @@
-CREATE TABLE `order` (
+CREATE TABLE `orders` (
   `id` VARCHAR(55) PRIMARY KEY,
   `user_id` VARCHAR(55),
   `total_cost` DECIMAL(10,2),
@@ -23,6 +23,6 @@ CREATE TABLE `order_item` (
   `updated_by` VARCHAR(55) NULL DEFAULT NULL,
   `deleted_at` TIMESTAMP NULL DEFAULT NULL,
   `deleted_by` VARCHAR(55) NULL DEFAULT NULL,
-  CONSTRAINT `fk_order_item_order` FOREIGN KEY (`order_id`) REFERENCES `order`(`id`),
+  CONSTRAINT `fk_order_item_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`),
   CONSTRAINT `fk_order_item_product` FOREIGN KEY (`product_id`) REFERENCES `product`(`id`)
 );

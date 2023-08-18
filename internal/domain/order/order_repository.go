@@ -46,28 +46,40 @@ func (r *OrderRepositoryMySQL) Checkout(order Order, cartID uuid.UUID) (err erro
 	}
 
 	return r.DB.WithTransaction(func(tx *sqlx.Tx, e chan error) {
-		if err := r.txCreateOrder(tx, order); err != nil {
-			e <- err
+		// Wrap the entire checkout process in a transaction
+		txErr := func(err error) {
+			if err != nil {
+				e <- err
+				tx.Rollback() // Rollback the transaction
+			}
+		}
+
+		// Create the order
+		if err := r.txCreate(tx, order); err != nil {
+			txErr(err)
 			return
 		}
 
+		// Transfer items to the order
 		if err := r.txTransferItemsToOrder(tx, order.Items); err != nil {
-			e <- err
+			txErr(err)
 			return
 		}
 
+		// Remove checked out cart items
 		if err := r.txRemoveCheckedOutCartItems(tx, cartID, productIDs); err != nil {
-			e <- err
+			txErr(err)
 			return
 		}
 
 		e <- nil
 	})
 }
+
 func (r *OrderRepositoryMySQL) ExistsByID(id uuid.UUID) (exists bool, err error) {
 	err = r.DB.Read.Get(
 		&exists,
-		"SELECT COUNT(entity_id) FROM order WHERE id = ?",
+		"SELECT COUNT(id) FROM orders WHERE id = ?",
 		id.String())
 	if err != nil {
 		logger.ErrorWithStack(err)
@@ -76,10 +88,10 @@ func (r *OrderRepositoryMySQL) ExistsByID(id uuid.UUID) (exists bool, err error)
 	return
 }
 
-// transactions
+// Transactions
 func (r *OrderRepositoryMySQL) composeBulkInsertItemQuery(orderItems []OrderItem) (query string, params []interface{}, err error) {
-	bulkQuery := ``
-	bulkPlaceholderQuery := ``
+	bulkQuery := `INSERT INTO order_item (cart_id, product_id, unit_price, quantity, cost, created_at, created_by, updated_at, updated_by, deleted_at, deleted_by) VALUES `
+	bulkPlaceholderQuery := `(:cart_id, :product_id, :unit_price, :quantity, :cost, :created_at, :created_by, :updated_at, :updated_by, :deleted_at, :deleted_by)`
 
 	values := []string{}
 	for _, oi := range orderItems {
@@ -97,7 +109,7 @@ func (r *OrderRepositoryMySQL) composeBulkInsertItemQuery(orderItems []OrderItem
 	return
 }
 func (r *OrderRepositoryMySQL) txCreate(tx *sqlx.Tx, order Order) (err error) {
-	query := ``
+	query := `INSERT INTO orders (id, user_id, total_cost, status, created_at, created_by, updated_at, updated_by, deleted_at, deleted_by) VALUES (:id, :user_id, :total_cost, :status, :created_at, :created_by, :updated_at, :updated_by, :deleted_at, :deleted_by)`
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -136,23 +148,6 @@ func (r *OrderRepositoryMySQL) txCreateItems(tx *sqlx.Tx, orderItems []OrderItem
 
 	return
 }
-func (r *OrderRepositoryMySQL) txCreateOrder(tx *sqlx.Tx, order Order) error {
-	// Assuming your Order table's insert query goes here.
-	query := `INSERT INTO orders (/* Your columns here */) VALUES (/* :named_parameters here */)`
-	stmt, err := tx.PrepareNamed(query)
-	if err != nil {
-		logger.ErrorWithStack(err)
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(order)
-	if err != nil {
-		logger.ErrorWithStack(err)
-		return err
-	}
-	return nil
-}
 func (r *OrderRepositoryMySQL) txTransferItemsToOrder(tx *sqlx.Tx, orderItems []OrderItem) error {
 	return r.txCreateItems(tx, orderItems)
 }
@@ -161,7 +156,7 @@ func (r *OrderRepositoryMySQL) txRemoveCheckedOutCartItems(tx *sqlx.Tx, cartID u
 		return nil
 	}
 
-	query := `DELETE FROM cart_items WHERE cart_id = ? AND product_id IN (?)`
+	query := `DELETE FROM cart_item WHERE cart_id = ? AND product_id IN (?)`
 	query, args, err := sqlx.In(query, cartID, productIDs)
 	if err != nil {
 		logger.ErrorWithStack(err)

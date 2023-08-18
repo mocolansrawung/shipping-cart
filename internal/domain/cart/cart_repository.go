@@ -157,13 +157,13 @@ func (r *CartRepositoryMySQL) CreateCartItem(cartItem CartItem, userID uuid.UUID
 	})
 }
 func (r *CartRepositoryMySQL) ResolveDetailedItemsByCartID(ids []uuid.UUID) (cartItems []CartItem, err error) {
-	initialQuery := `SELECT cart_item.cart_id, cart_item.product_id, cart_item.unit_price, cart_item.quantity, cart_item.cost, cart_item.created_at, cart_item.created_by, cart_item.updated_at, cart_item.updated_by, cart_item.deleted_at, cart_item.deleted_by, product.stock FROM cart_item JOIN product ON cart_item.product_id = product.id;
+	initialQuery := `SELECT cart_item.id, cart_item.cart_id, cart_item.product_id, cart_item.unit_price, cart_item.quantity, cart_item.cost, cart_item.created_at, cart_item.created_by, cart_item.updated_at, cart_item.updated_by, cart_item.deleted_at, cart_item.deleted_by, product.stock FROM cart_item JOIN product ON cart_item.product_id = product.id
 	`
 	if len(ids) == 0 {
 		return
 	}
 
-	query, args, err := sqlx.In(initialQuery+" WHERE cart_id IN (?)", ids)
+	query, args, err := sqlx.In(initialQuery+" WHERE cart_item.cart_id IN (?)", ids)
 	if err != nil {
 		logger.ErrorWithStack(err)
 		return

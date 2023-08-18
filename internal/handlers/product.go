@@ -34,6 +34,23 @@ func (h *ProductHandler) Router(r chi.Router) {
 	})
 }
 
+// ResolveProducts retrieves a list of products with optional filtering and pagination.
+// @Summary Retrieve a list of products.
+// @Description This endpoint retrieves a list of products with optional filtering and pagination.
+// @Tags products
+// @Security EVMOauthToken
+// @Param page query integer false "Page number for pagination (default 1)"
+// @Param limit query integer false "Number of items per page (default 10)"
+// @Param sort query string false "Sort field for ordering"
+// @Param order query string false "Sort order ('asc' or 'desc')"
+// @Param brand query string false "Filter by brand"
+// @Param category query string false "Filter by category"
+// @Produce json
+// @Success 200 {object} response.Base{data=ProductPaginationResponse}
+// @Failure 400 {object} response.Base
+// @Failure 401 {object} response.Base
+// @Failure 500 {object} response.Base
+// @Router /v1/products [get]
 func (h *ProductHandler) ResolveProducts(w http.ResponseWriter, r *http.Request) {
 	pageString := r.URL.Query().Get("page")
 	page, err := shared.ConvertQueryParamsToInt(pageString)
@@ -67,6 +84,18 @@ func (h *ProductHandler) ResolveProducts(w http.ResponseWriter, r *http.Request)
 	response.WithJSON(w, http.StatusOK, resp)
 }
 
+// CreateProduct creates a new product.
+// @Summary Create a new product.
+// @Description This endpoint creates a new product.
+// @Tags products
+// @Security EVMOauthToken
+// @Param product body ProductRequestFormat true "The product to be created."
+// @Produce json
+// @Success 201 {object} response.Base{data=ProductResponseFormat}
+// @Failure 400 {object} response.Base
+// @Failure 401 {object} response.Base
+// @Failure 500 {object} response.Base
+// @Router /v1/products [post]
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var requestFormat product.ProductRequestFormat

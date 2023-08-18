@@ -33,36 +33,38 @@ func ProvideOrderServiceImpl(orderRepository OrderRepository, cartService cart.C
 }
 
 func (s *OrderServiceImpl) Checkout(requestFormat OrderRequestFormat, userID uuid.UUID) (order Order, err error) {
-	// retrieve cart details
 	cart, err := s.CartService.ResolveDetailsByUserID(userID)
 	if err != nil {
 		return
 	}
 
-	// handling empty cart
 	if len(cart.Items) == 0 {
 		err = errors.New("cart is empty")
 		return order, err
 	}
 
-	// handling insufficient product stock
 	var insufficientStockProducts []string
-	for _, item := range cart.Items {
-		if item.Stock < item.Quantity {
-			insufficientStockProducts = append(insufficientStockProducts, item.ProductID.String())
+	for _, reqItem := range requestFormat.Items {
+		var foundInCart bool
+		for _, cartItem := range cart.Items {
+			if reqItem.CartItemID == cartItem.ID {
+				foundInCart = true
+				if cartItem.Stock < cartItem.Quantity {
+					insufficientStockProducts = append(insufficientStockProducts, cartItem.ProductID.String())
+				}
+				break
+			}
+		}
+		if !foundInCart {
+			return order, failure.BadRequest(errors.New("requested item not found in cart"))
 		}
 	}
+
 	if len(insufficientStockProducts) > 0 {
-		err = errors.New(fmt.Sprintf("Insufficient stock for products with IDs: %s", strings.Join(insufficientStockProducts, ", ")))
-		return order, err
+		return order, errors.New(fmt.Sprintf("Insufficient stock for products with IDs: %s", strings.Join(insufficientStockProducts, ", ")))
 	}
 
-	// must utilized request format
 	order, err = order.NewFromRequestFormat(requestFormat, userID)
-	if err != nil {
-		return
-	}
-
 	if err != nil {
 		return order, failure.BadRequest(err)
 	}
@@ -70,28 +72,4 @@ func (s *OrderServiceImpl) Checkout(requestFormat OrderRequestFormat, userID uui
 	err = s.OrderRepository.Checkout(order, cart.ID)
 
 	return
-
-	// populate items and totalcost
-	// order ID must be created -> fix this later
-	// var orderItems []OrderItem
-	// var totalCost float64
-	// for _, cartItem := range cart.Items {
-	// 	orderItem := OrderItem{
-	// 		ProductID: cartItem.ProductID,
-	// 		UnitPrice: cartItem.UnitPrice,
-	// 		Quantity:  cartItem.Quantity,
-	// 		Cost:      cartItem.Cost,
-	// 		CreatedAt: time.Now(),
-	// 		CreatedBy: userID,
-	// 	}
-	// 	orderItems = append(orderItems, orderItem)
-	// 	totalCost += cartItem.Cost
-	// }
-
-	// newOrder := Order{
-	// 	UserID:    userID,
-	// 	TotalCost: totalCost,
-	// 	Status:    OrderStatusPending,
-	// 	Items:     orderItems,
-	// }
 }
