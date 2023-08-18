@@ -1,49 +1,33 @@
-# PROJECT_TITLE
-This is the name of the project. It describes the whole project in one sentence, and helps people understand what 
-the main goal and aim of the project is.
+# Shipping Cart Service API
 
-## Project Badges
-Badges aren't necessary, but using them is a simple way of letting other developers know that you know what you're doing.
+Shipping Cart Service API is a service to manipulating product, cart, and order related to ecommerce implementation. This project is served as a final project of my Trainee program and basically consists of two microservices along with this service.
 
-Having this section can also be helpful to help link to important tools and also show some simple stats about your project 
-like the number of forks, contributors, open issues etc...
+## Getting Started
 
-Below is sample badges to help users/contributors know build status of this project.
+These instructions will guide you on how to run the Shipping Cart Service on your local machine.
 
-[![Coverage Status](https://coveralls.io/repos/USERNAME/PROJECT_NAME/badge.svg?branch=master)](https://coveralls.io/r/USERNAME/PROJECT_NAME)
-[![GitHub Stars](https://img.shields.io/github/stars/USERNAME/PROJECT_NAME.svg)]()
-[![Build Status](https://jenkinsx.evermosa2z.com/buildStatus/icon?job=[JOB_NAME]%2Fmaster)](https://jenkinsx.evermosa2z.com/job/[JOB_NAME]/job/master/)
+### Prerequisites
 
-## Description
+You need to have Go installed on your machine. This project is developed using Go 1.18.1. While it may work with other versions, it's advisable to use the version that the project was developed with.
 
-This is an important component of your project that many new developers often overlook.
+### Running the Project
 
-Your description is an extremely important aspect of your project. A well-crafted description allows you to show off 
-your work to other developers as well as potential employers.
+1. Download or clone this repository to your local machine.
 
+2. Navigate to the root directory of the project.
 
-## System Requirement
+3. Start the application by running the command: 
+    ```
+    make run
+    ```
+    This command will start the program. If a database file does not already exist, the program will create one. It will then start serving on the port specified in the `.env` file. By default, it is configured to use port `8081`. 
 
-Describe here the system requirements and dependencies for this project.
+You should now have the service running locally on your machine. You can interact with it using any HTTP client, or by using the provided Swagger UI.
 
-## Setup and Installation
+## API Documentation
 
-If you are working on a project that a user needs to install or run locally in a machine, 
-you should include the steps required to install your project and also the required dependencies if any.
+The API documentation for this project is available through Swagger UI. Once the project is running, you can access the Swagger UI at the following address:
 
-Provide a step-by-step description of how to get the development environment set and running.
+http://localhost:8081/swagger/index.html
 
-## Run and Test
-
-This section describe on how to run your project. Go the extra mile and write tests for your application. 
-Then provide code examples and how to run them.
-
-This will help show that you are certain and confident that your project will work without any challenges, 
-which will give other people confidence in it, too
-
-## Contributing
-
-This section describe on how to contribute to this project, for example :
-* pull request procedure
-* create issue procedure
-* etc
+In the Swagger UI, you will be able to see all available endpoints, their expected input and output, and you can even test the endpoints directly in the UI.
