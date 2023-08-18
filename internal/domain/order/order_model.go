@@ -64,6 +64,7 @@ func (o Order) NewFromRequestFormat(req OrderRequestFormat, userID uuid.UUID) (n
 		CreatedBy: userID,
 	}
 
+	fmt.Println(req.Items)
 	items := make([]OrderItem, 0)
 	for _, requestItem := range req.Items {
 		item := OrderItem{}
@@ -180,13 +181,8 @@ func (oi OrderItem) MarshalJSON() ([]byte, error) {
 	return json.Marshal(oi.ToResponseFormat())
 }
 func (oi OrderItem) NewFromRequestFormat(format OrderItemRequestFormat, orderID uuid.UUID) (newOrderItem OrderItem, err error) {
-	itemID, err := uuid.NewV4()
-	if err != nil {
-		return
-	}
-
 	newOrderItem = OrderItem{
-		CartItemID: itemID,
+		CartItemID: format.CartItemID,
 		OrderID:    orderID,
 	}
 

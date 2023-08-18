@@ -70,6 +70,9 @@ func (s *OrderServiceImpl) Checkout(requestFormat OrderRequestFormat, userID uui
 	}
 
 	err = s.OrderRepository.Checkout(order, cart.ID)
+	if err != nil {
+		return
+	}
 
 	return
 }
